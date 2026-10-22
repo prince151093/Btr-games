@@ -15,6 +15,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
 .flight:before{content:"";position:absolute;inset:0;background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:42px 42px;transform:perspective(260px) rotateX(22deg) scale(1.4);transform-origin:bottom}
 .sky-label{position:absolute;top:16px;left:18px;color:#a8bbd5;font-size:12px;letter-spacing:1.4px;font-weight:700}
 .status{position:absolute;right:16px;top:14px;border:1px solid #ffffff20;border-radius:999px;padding:6px 10px;font-size:11px;color:#c6d6e9;background:#111a2bcc}
+.takeoff-timer{position:absolute;left:50%;top:54px;transform:translateX(-50%);z-index:2;padding:8px 14px;border:1px solid #ffffff24;border-radius:12px;background:#080d17d9;color:#fff;text-align:center;white-space:nowrap;font-size:clamp(13px,2vw,17px);font-weight:850;box-shadow:0 8px 24px #0004}.takeoff-timer strong{color:#ff6477;font-variant-numeric:tabular-nums}.takeoff-timer.flying strong{color:#68efb0}
 .multiplier{position:absolute;top:76px;width:100%;text-align:center;font-size:clamp(48px,8vw,82px);font-weight:900;letter-spacing:-3px;text-shadow:0 0 30px #ff455933;font-variant-numeric:tabular-nums}
 .multiplier.running{color:#fff}.multiplier.crashed{color:var(--red)}.multiplier.waiting{color:#d7e3f5}
 .trail{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
@@ -37,6 +38,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
 <main>
 <section class="panel flight">
  <div class="sky-label">FLIGHT STATUS / LIVE ROUND</div><div id="status" class="status">CONNECTING</div>
+ <div id="takeoffTimer" class="takeoff-timer">TAKEOFF IN <strong id="countdownValue">—</strong></div>
  <div id="multiplier" class="multiplier waiting">1.00×</div>
  <svg class="trail" viewBox="0 0 700 340" preserveAspectRatio="none"><path id="trailGlow" d="M65 285 Q220 278 300 225 T560 120" fill="none" stroke="#ff4259" stroke-width="3" opacity=".12"/><path id="trailPath" d="M65 285 Q220 278 300 225 T560 120" fill="none" stroke="#ff5267" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="700" stroke-dashoffset="700"/></svg>
  <div id="plane" class="plane"><svg viewBox="0 0 100 100" aria-label="red plane"><path d="M7 55 L43 43 L62 12 Q66 7 70 12 L65 40 L91 47 Q97 50 91 54 L64 60 L54 86 Q51 92 47 86 L42 63 Z" fill="#ff4057" stroke="#ff9aa6" stroke-width="2"/><path d="M19 54 L43 51 L48 59 Z" fill="#ffd5d9"/></svg></div>
@@ -67,6 +69,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
  let game = {phase:'waiting', multiplier:1, roundId:0, history:[], online:0};
  let player = null, bet = null, resultForRound = null, lastActivity = '';
  let countdownTimer = null;
+ let serverOffset = 0;
  function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').classList.remove('show'),2600)}
  function addActivity(left,right){const key=left+'|'+right;if(key===lastActivity)return;lastActivity=key;const el=document.createElement('div');el.className='activity-item';const a=document.createElement('span'),b=document.createElement('strong');a.textContent=left;b.textContent=right;el.append(a,b);$('activity').prepend(el);while($('activity').children.length>8)$('activity').lastElementChild.remove()}
  function fmt(n){return Number(n||0).toLocaleString('en-US')}
@@ -89,7 +92,10 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
   $('multiplier').className='multiplier '+game.phase;
   $('status').textContent=game.phase==='running'?'PLANE IN FLIGHT':game.phase==='crashed'?'CRASHED':'NEXT ROUND';
   $('roundText').textContent='Round #'+(game.roundId||0);
-  $('timerText').textContent=game.phase==='running'?'Cash out before the crash':game.phase==='crashed'?'Crashed at '+Number(game.crashPoint||1).toFixed(2)+'×':'Next takeoff soon';
+  const timer=$('takeoffTimer');
+  const countdown=$('countdownValue');
+  if(game.phase==='running'){timer.classList.add('flying');timer.innerHTML='PLANE IN FLIGHT · <strong>LIVE</strong>';countdown.textContent='LIVE';$('timerText').textContent='Cash out before the crash';}
+  else {timer.classList.remove('flying');const ms=Math.max(0,(Number(game.nextRoundAt)||Date.now())-(Date.now()+serverOffset));const seconds=(ms/1000).toFixed(1)+'s';timer.innerHTML='TAKEOFF IN <strong id="countdownValue">'+seconds+'</strong>'; $('timerText').textContent=game.phase==='crashed'?'Crashed at '+Number(game.crashPoint||1).toFixed(2)+'×':'Place your bet before takeoff';}
   $('history').replaceChildren();
   if(!game.history||!game.history.length){const s=document.createElement('span');s.className='muted';s.textContent='Waiting for first round…';$('history').append(s)}
   else game.history.forEach(item=>{const c=document.createElement('span');c.className='chip '+(item.crashPoint<2?'low':item.crashPoint<10?'mid':'high');c.textContent=Number(item.crashPoint).toFixed(2)+'×';$('history').append(c)});
@@ -114,6 +120,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
  socket.on('game:state',s=>{
   const oldRound=game.roundId;
   game={...game,...s};
+  if(Number.isFinite(s.serverTime)) serverOffset=Date.now()-s.serverTime;
   if(oldRound!==game.roundId){resultForRound=null; /* keep the countdown bet for the round taking off */ }
   if(game.phase==='crashed'&&resultForRound!==game.roundId){resultForRound=game.roundId;addActivity('Round #'+game.roundId+' crashed',Number(game.crashPoint).toFixed(2)+'×')}
   render();
@@ -128,6 +135,8 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
  });
  socket.on('game:error',msg=>toast(msg));
  render();
+ setInterval(()=>{if(game.phase!=='running')renderCountdownOnly()},100);
+ function renderCountdownOnly(){const el=$('countdownValue');if(!el||game.phase==='running')return;const ms=Math.max(0,(Number(game.nextRoundAt)||Date.now())-(Date.now()-serverOffset));el.textContent=(ms/1000).toFixed(1)+'s';}
 })();
 </script>
 </body>
