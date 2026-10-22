@@ -74,8 +74,6 @@ function authRequired(req, res, next) {
 // Separate owner-admin session. Credentials are configured only in server environment.
 const adminSessions = new Map();
 const runtimeSettings = { aviator:{enabled:true,duration_seconds:30,rules:''}, bigsmall:{enabled:true,duration_seconds:30,rules:''}, color:{enabled:true,duration_seconds:30,rules:''}, lucky:{enabled:true,duration_seconds:30,rules:''} };
-// Transparent demo/QA-only one-shot outcomes. Each override is consumed by the next round start.
-const pendingAdminResults = Object.create(null);
 const suspendedUsers = new Set();
 function gameEnabled(game){ return runtimeSettings[game]?.enabled !== false; }
 function gameDurationMs(game){ return Math.max(5,Math.min(300,Number(runtimeSettings[game]?.duration_seconds)||30))*1000; }
@@ -257,33 +255,6 @@ app.get('/api/admin/reports', adminRequired, async (req,res) => {
   const expenses=(ex.data||[]).filter(e=>(!from||e.expense_date>=from)&&(!to||e.expense_date<=to));
   res.json({rows:rows.slice(0,1000),byGame,expenses,totalExpenses:expenses.reduce((n,e)=>n+Number(e.amount||0),0),net:Object.values(byGame).reduce((n,g)=>n+g.net,0),operatingNet:Object.values(byGame).reduce((n,g)=>n+g.net,0)-expenses.reduce((n,e)=>n+Number(e.amount||0),0)});
 });
-app.get('/api/admin/results',adminRequired,(req,res)=>res.json({pending:pendingAdminResults}));
-app.post('/api/admin/results',adminRequired,async(req,res)=>{
-  const game=String(req.body?.game||'');
-  if(!['aviator','bigsmall','color','lucky'].includes(game))return res.status(400).json({error:'Choose a valid game.'});
-  let result=req.body?.result;
-  if(game==='aviator'){
-    result=Number(result);
-    if(!Number.isFinite(result)||result<1||result>1000)return res.status(400).json({error:'Aviator crash multiplier must be between 1.00x and 1000.00x.'});
-    result=Math.round(result*100)/100;
-  }else if(game==='bigsmall'||game==='lucky'){
-    result=Number(result);
-    if(!Number.isInteger(result)||result<0||result>9)return res.status(400).json({error:'Choose a digit from 0 to 9.'});
-  }else{
-    result=String(result||'').toLowerCase();
-    if(!['blue','green','yellow','red','pink','violet','black','orange'].includes(result))return res.status(400).json({error:'Choose a valid color result.'});
-  }
-  pendingAdminResults[game]=result;
-  await auditAdmin(req,'queue_demo_next_round_result','game',game,{result,notice:'Admin-set outcome for virtual-credit demo/QA only'});
-  res.json({ok:true,game,result,pending:pendingAdminResults});
-});
-app.delete('/api/admin/results/:game',adminRequired,async(req,res)=>{
-  const game=String(req.params.game||'');
-  if(!['aviator','bigsmall','color','lucky'].includes(game))return res.status(400).json({error:'Choose a valid game.'});
-  delete pendingAdminResults[game];
-  await auditAdmin(req,'cancel_demo_next_round_result','game',game,{notice:'Queued demo outcome cancelled'});
-  res.json({ok:true,pending:pendingAdminResults});
-});
 app.get('/api/admin/settings',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_game_settings').select('*').order('game');if(error)return res.status(503).json({error:'Settings table unavailable. Apply admin SQL migration.'});for(const row of data||[])runtimeSettings[row.game]={enabled:row.enabled,duration_seconds:row.duration_seconds,rules:row.rules||''};res.json({settings:data||[]});});
 app.put('/api/admin/settings/:game',adminRequired,async(req,res)=>{const game=String(req.params.game);if(!['aviator','bigsmall','color','lucky'].includes(game))return res.status(400).json({error:'Unknown game.'});const enabled=req.body?.enabled===true;const duration=Number(req.body?.duration_seconds);const rules=String(req.body?.rules||'').slice(0,4000);if(!Number.isInteger(duration)||duration<5||duration>300)return res.status(400).json({error:'Duration must be 5–300 seconds.'});const {data,error}=await supabase.from('crashzone_admin_game_settings').upsert({game,enabled,duration_seconds:duration,rules,updated_by:req.admin.username,updated_at:new Date().toISOString()},{onConflict:'game'}).select().single();if(error)return res.status(503).json({error:'Could not save settings. Apply admin SQL migration.'});runtimeSettings[game]={enabled,duration_seconds:duration,rules};await auditAdmin(req,'update_game_settings','game',game,{enabled,duration_seconds:duration});res.json({setting:data});});
 app.get('/api/admin/expenses',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_expenses').select('*').order('expense_date',{ascending:false}).limit(500);if(error)return res.status(503).json({error:'Expenses table unavailable. Apply admin SQL migration.'});res.json({expenses:data||[]});});
@@ -335,9 +306,7 @@ function startMiniRound(type) {
   const now = Date.now(); const old = miniGames.get(type);
   if (!gameEnabled(type)) { const g={type,roundId:old?old.roundId+1:1,openedAt:now,closesAt:now,revealAt:now+gameDurationMs(type),result:randomMiniResult(type),resultVisible:false,history:old?old.history:[],wagers:new Map()}; miniGames.set(type,g); broadcastMini(type); return; }
   const history = old ? old.history : [];
-  const selectedResult = Object.prototype.hasOwnProperty.call(pendingAdminResults,type) ? pendingAdminResults[type] : randomMiniResult(type);
-  delete pendingAdminResults[type];
-  const g = { type, roundId: old ? old.roundId + 1 : 1, openedAt: now, closesAt: now + gameDurationMs(type), revealAt: now + gameDurationMs(type), result: selectedResult, resultVisible: false, history, wagers: new Map() };
+  const g = { type, roundId: old ? old.roundId + 1 : 1, openedAt: now, closesAt: now + gameDurationMs(type), revealAt: now + gameDurationMs(type), result: randomMiniResult(type), resultVisible: false, history, wagers: new Map() };
   miniGames.set(type, g); broadcastMini(type);
 }
 for (const type of Object.keys(MINI_CONFIG)) startMiniRound(type);
@@ -349,6 +318,8 @@ setInterval(() => {
       g.resultVisible = true; g.history.unshift({ roundId: g.roundId, result: g.result }); g.history = g.history.slice(0, 100);
       for (const [socketId, wagers] of g.wagers) {
         const player = players.get(socketId); if (!player) continue;
+        const roundTotalStake = wagers.reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+        let roundTotalPayout = 0;
         for (const wager of wagers) {
           if (wager.settled) continue;
           const isDigitPick = type === 'bigsmall' && /^[0-9]$/.test(wager.pick);
@@ -359,11 +330,11 @@ setInterval(() => {
           // Side bets (BIG/SMALL) do not change the exact-number multiplier.
           const multiplier = isDigitPick ? 8 / Math.max(1, exactNumberCount) : type === 'bigsmall' && wager.pick === 'violet' ? 4.5 : type === 'bigsmall' && ['green','red'].includes(wager.pick) ? 1.9 : MINI_CONFIG[type].payout;
           const payout = won ? Math.floor(wager.amount * multiplier) : 0;
-          player.balance += payout; wager.settled = true; wager.status = won ? 'won' : 'lost'; wager.payout = payout;
+          player.balance += payout; roundTotalPayout += payout; wager.settled = true; wager.status = won ? 'won' : 'lost'; wager.payout = payout;
           if (payout > 0) writeLedger({game:type,roundId:g.roundId,userId:player.userId,username:player.name,entryType:'payout',amount:payout,details:{pick:wager.pick,result:g.result,multiplier}});
           io.to(socketId).emit('mini:result', { type, roundId: g.roundId, pick: wager.pick, result: g.result, amount: wager.amount, won, payout, balance: player.balance, multiplier });
         }
-        persistBalance(player); const sock = io.sockets.sockets.get(socketId); if (sock) sendPlayer(sock);
+        persistBalance(player); const sock = io.sockets.sockets.get(socketId); if (sock) { sendPlayer(sock); sock.emit('mini:round:summary', { type, roundId:g.roundId, totalStake:roundTotalStake, totalPayout:roundTotalPayout, net:roundTotalPayout-roundTotalStake, balance:player.balance }); }
       }
       broadcastMini(type);
       setTimeout(() => startMiniRound(type), 1800);
@@ -441,8 +412,7 @@ function startRound() {
   state.nextRoundAt = null;
   // Keep bets placed during the countdown; they belong to the round that just started.
   for (const bet of bets.values()) bet.roundId = state.roundId;
-  const point = Object.prototype.hasOwnProperty.call(pendingAdminResults,'aviator') ? pendingAdminResults.aviator : randomCrashPoint();
-  delete pendingAdminResults.aviator;
+  const point = randomCrashPoint();
   targetCrashAtMs = elapsedForMultiplier(point);
   state._target = point;
   broadcast();
