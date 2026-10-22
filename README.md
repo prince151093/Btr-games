@@ -49,3 +49,9 @@ The server expects `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` at startup and
 - Color Prediction returns 7x on a correct color; Lucky Number returns 8x on a correct number. Multipliers are gross returns including the stake.
 - A maximum of five distinct selections is enforced per player per round. Each selection has its own stake; all accepted stakes are deducted up front and wins are credited at settlement.
 - Prediction-game balances use virtual credits only. The listed multipliers imply different house edges: approximately 5% for BIG/SMALL, 12.5% for an equally likely eight-color game, and 20% for exact-number picks.
+
+## Result animation and queued demo outcomes
+
+- The player app shows one 3-second win/loss/break-even overlay for each settled Big Small, Color Prediction, or Lucky Number round with bets, using the server's authoritative round summary (total payout minus total stake). Aviator retains its own bet-result display.
+- Admin → Game Management includes **Next-round result · Demo / QA only**. Queue a one-shot test outcome for Aviator (1.00×–1000.00×), Big Small (digit 0–9), Color Prediction (listed color), or Lucky Number (digit 0–9). It is consumed by the next round start and recorded in the audit log.
+- Queued outcomes are stored in server memory and are lost on restart. This is for transparent virtual-credit testing only; do not use forced outcomes to misrepresent the fairness of a game.
