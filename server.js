@@ -129,15 +129,15 @@ app.get('/health', (_req, res) => res.json({
 }));
 app.get('/', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
-const WAIT_MS = 15000;
+const WAIT_MS = 30000; // 30-second countdown between Aviator rounds
 const TICK_MS = 100;
 const MAX_BET = 1000;
 const STARTING_CREDITS = 1000;
 const players = new Map();
 const bets = new Map();
 const miniGames = new Map();
-const MINI_BET_WINDOW_MS = 15000;
-const MINI_ROUND_MS = 15000;
+const MINI_BET_WINDOW_MS = 30000; // 30-second betting window for all mini games
+const MINI_ROUND_MS = 30000; // reveal the result after the 30-second round
 const MINI_MAX_BET = 1000;
 const MINI_CONFIG = { bigsmall: { payout: 1.9 }, color: { payout: 7 }, lucky: { payout: 8 } };
 function randomMiniResult(type) {
