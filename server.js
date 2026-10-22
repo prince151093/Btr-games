@@ -330,8 +330,10 @@ io.on('connection', socket => {
     if (Date.now() >= g.closesAt || g.resultVisible) return socket.emit('game:error', 'Betting is closed for this round.');
     const picks = [...new Set((Array.isArray(raw.picks) ? raw.picks : [raw.pick]).map(v => String(v)))];
     const validPick = pick => type === 'bigsmall' ? (['big','small'].includes(pick) || /^[0-9]$/.test(pick)) : type === 'color' ? ['blue','green','yellow','red','pink','violet','black','orange'].includes(pick) : /^[0-9]$/.test(pick);
-    if (!picks.length || picks.length > 10 || picks.some(pick => !validPick(pick))) return socket.emit('game:error', 'Choose valid options.');
-    if (picks.some(pick => (g.wagers.get(socket.id) || []).some(w => w.pick === pick))) return socket.emit('game:error', 'You already placed a bid on one of these options this round.');
+    if (!picks.length || picks.some(pick => !validPick(pick))) return socket.emit('game:error', 'Choose valid options.');
+    const existingWagers = g.wagers.get(socket.id) || [];
+    if (picks.some(pick => existingWagers.some(w => w.pick === pick))) return socket.emit('game:error', 'You already placed a bid on one of these options this round.');
+    if (existingWagers.length + picks.length > 5) return socket.emit('game:error', 'Maximum 5 bids per round. Remove some selections and try again.');
     const amount = Number(raw.amount);
     if (!Number.isInteger(amount) || amount < 1 || amount > MINI_MAX_BET) return socket.emit('game:error', `Each bid must be 1–${MINI_MAX_BET} virtual credits.`);
     const total = amount * picks.length;
