@@ -11,11 +11,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:16p
 .logo{font-size:20px;font-weight:900;letter-spacing:1px}.logo span{color:var(--red)}.online{color:var(--muted);font-size:13px}
 main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:16px}
 .panel{background:linear-gradient(145deg,#141e30,#0e1523);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 14px 40px #0003}
-.flight{position:relative;min-height:300px;background:radial-gradient(ellipse at 50% 90%,#243b5a 0,#101d31 55%,#0b1220 100%);overflow:hidden}
+.flight{position:relative;min-height:340px;background:radial-gradient(ellipse at 50% 90%,#243b5a 0,#101d31 55%,#0b1220 100%);overflow:hidden}
 .flight:before{content:"";position:absolute;inset:0;background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:42px 42px;transform:perspective(260px) rotateX(22deg) scale(1.4);transform-origin:bottom}
 .sky-label{position:absolute;top:16px;left:18px;color:#a8bbd5;font-size:12px;letter-spacing:1.4px;font-weight:700}
 .status{position:absolute;right:16px;top:14px;border:1px solid #ffffff20;border-radius:999px;padding:6px 10px;font-size:11px;color:#c6d6e9;background:#111a2bcc}
-.takeoff-timer{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:2;background:#070d18b8;color:#dce7f8;text-align:center;font-size:clamp(18px,4vw,28px);font-weight:900;letter-spacing:1.5px;text-shadow:0 3px 18px #000;pointer-events:none;font-variant-numeric:tabular-nums}.takeoff-timer strong{display:block;color:#ff5369;font-size:clamp(100px,25vw,190px);line-height:1;letter-spacing:-3px;font-variant-numeric:tabular-nums;text-shadow:0 0 36px #ff425955}.takeoff-timer.hidden{display:none}
+.takeoff-timer{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:2;background:#070d18b8;color:#dce7f8;text-align:center;font-size:clamp(16px,3vw,24px);font-weight:900;letter-spacing:1.5px;text-shadow:0 3px 18px #000;pointer-events:none}.takeoff-timer strong{display:block;color:#ff5369;font-size:clamp(88px,24vw,190px);line-height:.95;letter-spacing:-5px;font-variant-numeric:tabular-nums;text-shadow:0 0 36px #ff425955}.takeoff-timer.flying{inset:14px auto auto 50%;transform:translateX(-50%);height:auto;display:block;padding:8px 14px;border:1px solid #ffffff24;border-radius:12px;background:#080d17d9;font-size:12px;letter-spacing:.5px;white-space:nowrap}.takeoff-timer.flying strong{display:inline;font-size:14px;letter-spacing:0;text-shadow:none;color:#68efb0}
 .multiplier{position:absolute;top:76px;width:100%;text-align:center;font-size:clamp(48px,8vw,82px);font-weight:900;letter-spacing:-3px;text-shadow:0 0 30px #ff455933;font-variant-numeric:tabular-nums}
 .multiplier.running{color:#fff}.multiplier.crashed{color:var(--red)}.multiplier.waiting{color:#d7e3f5}
 .trail{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
@@ -24,13 +24,17 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
 .flight-footer{position:absolute;bottom:14px;left:16px;right:16px;display:flex;justify-content:space-between;color:#9fb1cb;font-size:12px}
 .controls{padding:18px}.balance-line{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.muted{color:var(--muted)}.balance{font-size:21px;font-weight:800}
 .field-label{display:block;color:#9fb1cb;font-size:12px;margin:0 0 7px}.bet-row{display:flex;gap:8px}.bet-input{min-width:0;flex:1;background:#0a1120;border:1px solid #30415d;border-radius:10px;padding:13px;color:white;font-size:16px;outline:none}.bet-input:focus{border-color:#6385ba}
-.small-btn,.primary{border:0;border-radius:10px;font-weight:800;cursor:pointer;transition:filter .15s,transform .15s}.small-btn{background:#24334b;color:#e4edf9;padding:0 12px;min-width:44px;min-height:44px}.small-btn:hover,.primary:hover{filter:brightness(1.12)}button:disabled{opacity:.42;cursor:not-allowed}
+.small-btn,.primary{border:0;border-radius:10px;font-weight:800;cursor:pointer;transition:filter .15s,transform .15s}.small-btn{background:#24334b;color:#e4edf9;padding:0 12px}.small-btn:hover,.primary:hover{filter:brightness(1.12)}button:disabled{opacity:.42;cursor:not-allowed}
 .primary{width:100%;margin-top:12px;padding:15px;background:linear-gradient(135deg,#ff5366,#dc253e);color:white;font-size:16px;box-shadow:0 7px 20px #ed294533}.primary.cash{background:linear-gradient(135deg,#37e6a0,#13b978);color:#061a12;box-shadow:0 7px 20px #19ca8433}
-.return-line{display:flex;justify-content:space-between;margin-top:13px;font-size:13px}.auto-row{display:grid;grid-template-columns:auto minmax(90px,120px) 1fr;align-items:center;gap:9px;margin-top:13px;color:#9fb1cb;font-size:13px}.auto-input{width:100%;min-width:0;background:#0a1120;border:1px solid #526887;border-radius:8px;padding:10px;color:white;font-size:16px}.auto-help{grid-column:1/-1;font-size:11px;color:#8194af;margin-top:-3px}.return-line strong{color:var(--green)}
-.history-wrap{grid-column:1/-1;padding:16px 18px}.section-title{font-size:14px;font-weight:800;letter-spacing:.5px;margin-bottom:13px}.history{display:grid;grid-template-columns:1fr;gap:7px}.chip{display:flex;align-items:center;justify-content:flex-start;min-width:0;padding:8px 10px;border-radius:8px;background:#273247;color:#d9e4f4;font-size:13px;font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}.history-note{font-size:11px;color:#8194af;margin:-6px 0 12px}.chip.low{background:#42202c;color:#ff8996}.chip.mid{background:#263b37;color:#6fe7b1}.chip.high{background:#293554;color:#9bb9ff}
-.activity{grid-column:1/-1;padding:16px 18px}.activity-list{display:grid;gap:8px;max-height:320px;overflow:auto}.activity-item{display:flex;justify-content:space-between;gap:6px;padding:9px 10px;background:#0b1321;border-radius:8px;color:#aebfd6;font-size:13px}.activity-item strong{color:#f5f7fb;white-space:nowrap}
+.return-line{display:flex;justify-content:space-between;margin-top:13px;font-size:13px}.auto-row{display:flex;align-items:center;gap:10px;margin-top:13px;color:#9fb1cb;font-size:13px}.auto-row input{width:18px;height:18px;accent-color:#ff4259}.auto-input{width:100px;background:#0a1120;border:1px solid #30415d;border-radius:8px;padding:8px;color:white}.return-line strong{color:var(--green)}
+/* History panels: side by side, with readable full-width rows */
+.history-wrap{grid-column:1;padding:16px 18px;min-width:0}.section-title{font-size:14px;font-weight:800;letter-spacing:.5px;margin-bottom:13px}
+.history{display:flex;flex-direction:column;gap:8px;width:100%}
+.chip{display:flex;align-items:center;justify-content:flex-start;width:100%;min-height:48px;padding:10px 14px;border-radius:12px;background:#273247;color:#d9e4f4;font-size:clamp(19px,2.2vw,24px);line-height:1.2;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+.chip.low{background:#42202c;color:#ff8996}.chip.mid{background:#263b37;color:#6fe7b1}.chip.high{background:#293554;color:#9bb9ff}
+.activity{grid-column:2;padding:16px 18px;min-width:0}.activity-list{display:grid;gap:8px;max-height:520px;overflow:auto}.activity-item{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:12px 10px;background:#0b1321;border-radius:10px;color:#aebfd6;font-size:13px;overflow-wrap:anywhere}.activity-item strong{color:#f5f7fb;font-size:18px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#26344a;border:1px solid #415777;border-radius:10px;padding:12px 16px;z-index:10;transition:.2s;max-width:90vw}.toast.show{opacity:1;transform:translate(-50%,0)}.disclaimer{text-align:center;color:#71839e;font-size:11px;padding:0 16px 22px}
-@media(max-width:760px){main{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:10px;gap:10px}.flight,main>section.panel:nth-child(2){grid-column:1/-1}.flight{min-height:260px;height:260px}.history-wrap,.activity{grid-column:auto;min-width:0;padding:12px 10px}.section-title{font-size:12px;letter-spacing:.2px;line-height:1.25;min-height:30px}.history{grid-template-columns:1fr;gap:6px}.chip{font-size:12px;padding:8px 7px}.activity-list{max-height:360px;gap:6px}.activity-item{flex-direction:column;align-items:flex-start;gap:3px;padding:8px 7px;font-size:11px;overflow-wrap:anywhere}.activity-item strong{font-size:12px;white-space:normal}.activity .section-title{min-height:30px}header{padding:12px 14px}.multiplier{top:54px;font-size:clamp(42px,12vw,64px)}.takeoff-timer strong{font-size:clamp(84px,27vw,140px)}.controls{padding:14px}.bet-row{gap:6px}.small-btn{padding:0 8px;min-width:38px}.auto-row{grid-template-columns:auto minmax(88px,110px) 1fr}.flight-footer{bottom:10px;font-size:11px}}
+@media(max-width:760px){main{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:10px;gap:10px}.flight,main>section:nth-child(2){grid-column:1/-1}.flight{min-height:340px}.history-wrap{grid-column:1;padding:12px 10px}.activity{grid-column:2;padding:12px 10px}.section-title{font-size:12px;letter-spacing:.2px;overflow-wrap:anywhere}.chip{font-size:clamp(17px,4.5vw,22px);min-height:44px;padding:9px 10px}.activity-list{max-height:unset;overflow:visible}.activity-item{padding:9px 8px;font-size:11px}.activity-item strong{font-size:16px}header{padding:14px 16px}.multiplier{top:72px}.takeoff-timer strong{font-size:clamp(100px,32vw,180px)}.online{font-size:11px;white-space:nowrap}}
 </style>
 </head>
 <body>
@@ -38,7 +42,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
 <main>
 <section class="panel flight">
  <div class="sky-label">FLIGHT STATUS / LIVE ROUND</div><div id="status" class="status">CONNECTING</div>
- <div id="takeoffTimer" class="takeoff-timer">TAKEOFF IN<strong id="countdownValue">15</strong></div>
+ <div id="takeoffTimer" class="takeoff-timer">TAKEOFF IN <strong id="countdownValue">—</strong></div>
  <div id="multiplier" class="multiplier waiting">1.00×</div>
  <svg class="trail" viewBox="0 0 700 340" preserveAspectRatio="none"><path id="trailGlow" d="M65 285 Q220 278 300 225 T560 120" fill="none" stroke="#ff4259" stroke-width="3" opacity=".12"/><path id="trailPath" d="M65 285 Q220 278 300 225 T560 120" fill="none" stroke="#ff5267" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="700" stroke-dashoffset="700"/></svg>
  <div id="plane" class="plane"><svg viewBox="0 0 100 100" aria-label="red plane"><path d="M7 55 L43 43 L62 12 Q66 7 70 12 L65 40 L91 47 Q97 50 91 54 L64 60 L54 86 Q51 92 47 86 L42 63 Z" fill="#ff4057" stroke="#ff9aa6" stroke-width="2"/><path d="M19 54 L43 51 L48 59 Z" fill="#ffd5d9"/></svg></div>
@@ -49,14 +53,14 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
  <div class="controls">
   <div class="balance-line"><div><div class="muted" style="font-size:12px">YOUR VIRTUAL BALANCE</div><div class="balance"><span id="balance">1,000</span> <span style="font-size:12px;color:#9baec8">credits</span></div></div><div class="muted" style="font-size:12px;text-align:right">PILOT<br><strong id="pilotName" style="color:#fff">Connecting…</strong></div></div>
   <label class="field-label" for="betAmount">BET AMOUNT (VIRTUAL CREDITS)</label>
-  <div class="bet-row"><input id="betAmount" class="bet-input" type="number" min="1" max="1000" step="1" value="10"><button class="small-btn" type="button" data-amount="10">10</button><button class="small-btn" type="button" data-amount="20">20</button><button class="small-btn" type="button" data-amount="50">50</button><button class="small-btn" type="button" data-amount="100">100</button></div>
-  <div class="auto-row"><label for="autoCashout">Auto cash-out ×</label><input id="autoCashout" class="auto-input" type="number" min="1.01" max="100" step="0.01" value="" placeholder="e.g. 2.00" inputmode="decimal"><span class="muted">Optional</span><div class="auto-help">Enter a target like 2.00 before placing your bet. Leave blank to turn auto cash-out off. It applies to the next bet.</div></div>
+  <div class="bet-row"><input id="betAmount" class="bet-input" type="number" min="1" max="1000" step="1" value="100"><button class="small-btn" data-amount="50">50</button><button class="small-btn" data-amount="100">100</button><button class="small-btn" data-amount="250">250</button></div>
+  <div class="auto-row"><label for="autoCashout">Auto cash-out at ×</label><input id="autoCashout" class="auto-input" type="number" min="1.01" max="100" step="0.01" placeholder="Off"><span class="muted">Optional</span></div>
   <button id="actionButton" class="primary" disabled>CONNECTING…</button>
   <div class="return-line"><span class="muted">Potential return</span><strong id="potential">100 credits</strong></div>
   <div class="return-line"><span class="muted">Your current bet</span><span id="betStatus">No active bet</span></div>
  </div>
 </section>
-<section class="panel history-wrap"><div class="section-title">RECENT CRASHES</div><div class="history-note">Last 12 rounds · newest first · each value is the multiplier where that round crashed</div><div id="history" class="history"><span class="muted">Waiting for first round…</span></div></section>
+<section class="panel history-wrap"><div class="section-title">RECENT CRASHES</div><div id="history" class="history"><span class="muted">Waiting for first round…</span></div></section>
 <section class="panel activity"><div class="section-title">ROUND ACTIVITY</div><div id="activity" class="activity-list"><div class="activity-item"><span>Welcome to CrashZone</span><span>Virtual credits only</span></div></div></section>
 </main>
 <div class="disclaimer">DEMO GAME · VIRTUAL CREDITS HAVE NO CASH VALUE · NO DEPOSITS OR WITHDRAWALS</div>
@@ -70,6 +74,14 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
  let player = null, bet = null, resultForRound = null, lastActivity = '';
  let countdownTimer = null;
  let serverOffset = 0;
+ // Simulated display count for demo UI; this is not the actual connected-player total.
+ let simulatedOnline = 300 + Math.floor(Math.random() * 201);
+ setInterval(() => {
+  let next;
+  do { next = 300 + Math.floor(Math.random() * 201); } while (next === simulatedOnline);
+  simulatedOnline = next;
+  $('online').textContent = String(simulatedOnline);
+ }, 3000);
  function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').classList.remove('show'),2600)}
  function addActivity(left,right){const key=left+'|'+right;if(key===lastActivity)return;lastActivity=key;const el=document.createElement('div');el.className='activity-item';const a=document.createElement('span'),b=document.createElement('strong');a.textContent=left;b.textContent=right;el.append(a,b);$('activity').prepend(el);while($('activity').children.length>8)$('activity').lastElementChild.remove()}
  function fmt(n){return Number(n||0).toLocaleString('en-US')}
@@ -87,26 +99,21 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
   $('trailGlow').style.opacity=.12+progress*.6;
  }
  function render(){
-  $('online').textContent=game.online||0;
+  $('online').textContent=String(simulatedOnline);
   $('multiplier').textContent=(game.multiplier||1).toFixed(2)+'×';
   $('multiplier').className='multiplier '+game.phase;
   $('status').textContent=game.phase==='running'?'PLANE IN FLIGHT':game.phase==='crashed'?'CRASHED':'NEXT ROUND';
   $('roundText').textContent='Round #'+(game.roundId||0);
   const timer=$('takeoffTimer');
-  if(game.phase==='running'){
-   timer.classList.add('hidden');
-   $('timerText').textContent='';
-  } else {
-   timer.classList.remove('hidden');
-   updateCountdown();
-   $('timerText').textContent=game.phase==='crashed'?'Crashed at '+Number(game.crashPoint||1).toFixed(2)+'×':'Place your bet before takeoff';
-  }
+  const countdown=$('countdownValue');
+  if(game.phase==='running'){timer.classList.add('flying');timer.innerHTML='PLANE IN FLIGHT · <strong>LIVE</strong>';countdown.textContent='LIVE';$('timerText').textContent='Cash out before the crash';}
+  else {timer.classList.remove('flying');const ms=Math.max(0,(Number(game.nextRoundAt)||Date.now())-(Date.now()+serverOffset));const seconds=Math.max(1,Math.ceil(ms/1000));timer.innerHTML='TAKEOFF IN <strong id="countdownValue">'+seconds+'</strong>'; $('timerText').textContent=game.phase==='crashed'?'Crashed at '+Number(game.crashPoint||1).toFixed(2)+'×':'Place your bet before takeoff';}
   $('history').replaceChildren();
   if(!game.history||!game.history.length){const s=document.createElement('span');s.className='muted';s.textContent='Waiting for first round…';$('history').append(s)}
   else game.history.forEach(item=>{const c=document.createElement('span');c.className='chip '+(item.crashPoint<2?'low':item.crashPoint<10?'mid':'high');c.textContent=Number(item.crashPoint).toFixed(2)+'×';$('history').append(c)});
   $('balance').textContent=fmt(player?.balance||0);
   $('pilotName').textContent=player?.name||'Connecting…';
-  $('betStatus').textContent=bet?(bet.status==='cashed_out'?`Cashed at ${bet.multiplier}×`:bet.status==='lost'?'Lost':`Active · ${fmt(bet.amount)} credits${bet.autoCashout?' · auto '+Number(bet.autoCashout).toFixed(2)+'×':''}`):'No active bet';
+  $('betStatus').textContent=bet?(bet.status==='cashed_out'?`Cashed at ${bet.multiplier}×`:bet.status==='lost'?'Lost':`Active · ${fmt(bet.amount)} credits`):'No active bet';
   const button=$('actionButton');
   if(game.phase==='waiting'||game.phase==='crashed'){
    const canPlace=!bet||bet.status!=='active';button.disabled=!player||!canPlace;button.className='primary';button.textContent=canPlace?(game.phase==='crashed'?'PLACE NEXT BET':'PLACE BET'):'BET PLACED';
@@ -118,7 +125,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
   updatePotential();drawFlight();
  }
  $('actionButton').addEventListener('click',()=>{
-  if((game.phase==='waiting'||game.phase==='crashed')&&(!bet||bet.status!=='active')){const autoRaw=$('autoCashout').value.trim();const autoCashout=autoRaw===''?null:Number(autoRaw); if(autoCashout!==null&&(!Number.isFinite(autoCashout)||autoCashout<1.01||autoCashout>100)){toast('Enter an auto cash-out target from 1.01× to 100×, or leave it blank for off.');$('autoCashout').focus();return;} socket.emit('bet:place',{amount:Number($('betAmount').value),autoCashout});}
+  if((game.phase==='waiting'||game.phase==='crashed')&&(!bet||bet.status!=='active')){const autoRaw=$('autoCashout').value.trim();const autoCashout=autoRaw?Number(autoRaw):null; if(autoCashout!==null&&(!Number.isFinite(autoCashout)||autoCashout<1.01||autoCashout>100)){toast('Auto cash-out must be between 1.01× and 100×.');return;} socket.emit('bet:place',{amount:Number($('betAmount').value),autoCashout});}
   else if(game.phase==='running'&&bet&&bet.status==='active'){socket.emit('bet:cashout');}
  });
  socket.on('connect',()=>{});
@@ -140,8 +147,8 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
  });
  socket.on('game:error',msg=>toast(msg));
  render();
- setInterval(()=>{if(game.phase!=='running')updateCountdown()},200);
- function updateCountdown(){const el=$('countdownValue');if(!el)return;const deadline=Number(game.nextRoundAt);const now=Date.now()-serverOffset;const ms=Number.isFinite(deadline)?Math.max(0,deadline-now):15000;const seconds=game.phase==='crashed'||game.phase==='waiting'?Math.max(1,Math.ceil(ms/1000)):15;const next=String(Math.min(15,seconds));if(el.textContent!==next)el.textContent=next;}
+ setInterval(()=>{if(game.phase!=='running')renderCountdownOnly()},100);
+ function renderCountdownOnly(){const el=$('countdownValue');if(!el||game.phase==='running')return;const ms=Math.max(0,(Number(game.nextRoundAt)||Date.now())-(Date.now()-serverOffset));el.textContent=String(Math.max(1,Math.ceil(ms/1000)));}
 })();
 </script>
 </body>
