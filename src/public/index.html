@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrashZone — Aviator</title>
+<style>
+:root{color-scheme:dark;--bg:#090d17;--panel:#111a2b;--panel2:#18243a;--line:#283851;--muted:#9baec8;--red:#ff4259;--green:#40e6a0;--text:#f5f7fb}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -20%,#1b2c49 0,#090d17 55%);font:15px system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);min-height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px max(16px,calc((100vw - 1100px)/2));border-bottom:1px solid #ffffff12;background:#080d17d9;position:sticky;top:0;z-index:3}
+.logo{font-size:20px;font-weight:900;letter-spacing:1px}.logo span{color:var(--red)}.online{color:var(--muted);font-size:13px}
+main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:16px}
+.panel{background:linear-gradient(145deg,#141e30,#0e1523);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 14px 40px #0003}
+.flight{position:relative;min-height:340px;background:radial-gradient(ellipse at 50% 90%,#243b5a 0,#101d31 55%,#0b1220 100%);overflow:hidden}
+.flight:before{content:"";position:absolute;inset:0;background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:42px 42px;transform:perspective(260px) rotateX(22deg) scale(1.4);transform-origin:bottom}
+.sky-label{position:absolute;top:16px;left:18px;color:#a8bbd5;font-size:12px;letter-spacing:1.4px;font-weight:700}
+.status{position:absolute;right:16px;top:14px;border:1px solid #ffffff20;border-radius:999px;padding:6px 10px;font-size:11px;color:#c6d6e9;background:#111a2bcc}
+.multiplier{position:absolute;top:76px;width:100%;text-align:center;font-size:clamp(48px,8vw,82px);font-weight:900;letter-spacing:-3px;text-shadow:0 0 30px #ff455933;font-variant-numeric:tabular-nums}
+.multiplier.running{color:#fff}.multiplier.crashed{color:var(--red)}.multiplier.waiting{color:#d7e3f5}
+.trail{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.plane{position:absolute;left:12%;bottom:17%;font-size:54px;filter:drop-shadow(0 8px 12px #ff344c66);transform:rotate(-12deg);transition:left .12s linear,bottom .12s linear}
+.plane svg{width:78px;height:78px;overflow:visible}.flare{position:absolute;width:9px;height:9px;border-radius:50%;background:#ff687b;box-shadow:0 0 18px #ff4259;left:calc(12% - 5px);bottom:calc(17% + 26px)}
+.flight-footer{position:absolute;bottom:14px;left:16px;right:16px;display:flex;justify-content:space-between;color:#9fb1cb;font-size:12px}
+.controls{padding:18px}.balance-line{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.muted{color:var(--muted)}.balance{font-size:21px;font-weight:800}
+.field-label{display:block;color:#9fb1cb;font-size:12px;margin:0 0 7px}.bet-row{display:flex;gap:8px}.bet-input{min-width:0;flex:1;background:#0a1120;border:1px solid #30415d;border-radius:10px;padding:13px;color:white;font-size:16px;outline:none}.bet-input:focus{border-color:#6385ba}
+.small-btn,.primary{border:0;border-radius:10px;font-weight:800;cursor:pointer;transition:filter .15s,transform .15s}.small-btn{background:#24334b;color:#e4edf9;padding:0 12px}.small-btn:hover,.primary:hover{filter:brightness(1.12)}button:disabled{opacity:.42;cursor:not-allowed}
+.primary{width:100%;margin-top:12px;padding:15px;background:linear-gradient(135deg,#ff5366,#dc253e);color:white;font-size:16px;box-shadow:0 7px 20px #ed294533}.primary.cash{background:linear-gradient(135deg,#37e6a0,#13b978);color:#061a12;box-shadow:0 7px 20px #19ca8433}
+.return-line{display:flex;justify-content:space-between;margin-top:13px;font-size:13px}.return-line strong{color:var(--green)}
+.history-wrap{grid-column:1/-1;padding:16px 18px}.section-title{font-size:14px;font-weight:800;letter-spacing:.5px;margin-bottom:13px}.history{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:8px 12px;border-radius:999px;background:#273247;color:#d9e4f4;font-size:13px;font-weight:800}.chip.low{background:#42202c;color:#ff8996}.chip.mid{background:#263b37;color:#6fe7b1}.chip.high{background:#293554;color:#9bb9ff}
+.activity{grid-column:1/-1;padding:16px 18px}.activity-list{display:grid;gap:8px;max-height:170px;overflow:auto}.activity-item{display:flex;justify-content:space-between;padding:9px 10px;background:#0b1321;border-radius:8px;color:#aebfd6;font-size:13px}.activity-item strong{color:#f5f7fb}
+.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#26344a;border:1px solid #415777;border-radius:10px;padding:12px 16px;z-index:10;transition:.2s;max-width:90vw}.toast.show{opacity:1;transform:translate(-50%,0)}.disclaimer{text-align:center;color:#71839e;font-size:11px;padding:0 16px 22px}
+@media(max-width:760px){main{grid-template-columns:1fr;padding:12px}.flight{min-height:300px}.history-wrap,.activity{grid-column:auto}header{padding:14px 16px}.multiplier{top:72px}}
+</style>
+</head>
+<body>
+<header><div class="logo">CRASH<span>ZONE</span> <span style="color:#a9bad3;font-size:11px;letter-spacing:2px">AVIATOR</span></div><div class="online">● <span id="online">0</span> pilots online</div></header>
+<main>
+<section class="panel flight">
+ <div class="sky-label">FLIGHT STATUS / LIVE ROUND</div><div id="status" class="status">CONNECTING</div>
+ <div id="multiplier" class="multiplier waiting">1.00×</div>
+ <svg class="trail" viewBox="0 0 700 340" preserveAspectRatio="none"><path id="trailGlow" d="M65 285 Q220 278 300 225 T560 120" fill="none" stroke="#ff4259" stroke-width="3" opacity=".12"/><path id="trailPath" d="M65 285 Q220 278 300 225 T560 120" fill="none" stroke="#ff5267" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="700" stroke-dashoffset="700"/></svg>
+ <div id="plane" class="plane"><svg viewBox="0 0 100 100" aria-label="red plane"><path d="M7 55 L43 43 L62 12 Q66 7 70 12 L65 40 L91 47 Q97 50 91 54 L64 60 L54 86 Q51 92 47 86 L42 63 Z" fill="#ff4057" stroke="#ff9aa6" stroke-width="2"/><path d="M19 54 L43 51 L48 59 Z" fill="#ffd5d9"/></svg></div>
+ <div class="flare" id="flare"></div>
+ <div class="flight-footer"><span id="roundText">Round waiting to start</span><span id="timerText">Place your bet</span></div>
+</section>
+<section class="panel">
+ <div class="controls">
+  <div class="balance-line"><div><div class="muted" style="font-size:12px">YOUR VIRTUAL BALANCE</div><div class="balance"><span id="balance">1,000</span> <span style="font-size:12px;color:#9baec8">credits</span></div></div><div class="muted" style="font-size:12px;text-align:right">PILOT<br><strong id="pilotName" style="color:#fff">Connecting…</strong></div></div>
+  <label class="field-label" for="betAmount">BET AMOUNT (VIRTUAL CREDITS)</label>
+  <div class="bet-row"><input id="betAmount" class="bet-input" type="number" min="1" max="1000" step="1" value="100"><button class="small-btn" data-amount="50">50</button><button class="small-btn" data-amount="100">100</button><button class="small-btn" data-amount="250">250</button></div>
+  <button id="actionButton" class="primary" disabled>CONNECTING…</button>
+  <div class="return-line"><span class="muted">Potential return</span><strong id="potential">100 credits</strong></div>
+  <div class="return-line"><span class="muted">Your current bet</span><span id="betStatus">No active bet</span></div>
+ </div>
+</section>
+<section class="panel history-wrap"><div class="section-title">RECENT CRASHES</div><div id="history" class="history"><span class="muted">Waiting for first round…</span></div></section>
+<section class="panel activity"><div class="section-title">ROUND ACTIVITY</div><div id="activity" class="activity-list"><div class="activity-item"><span>Welcome to CrashZone</span><span>Virtual credits only</span></div></div></section>
+</main>
+<div class="disclaimer">DEMO GAME · VIRTUAL CREDITS HAVE NO CASH VALUE · NO DEPOSITS OR WITHDRAWALS</div>
+<div id="toast" class="toast"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+ const socket = io();
+ const $ = id => document.getElementById(id);
+ let game = {phase:'waiting', multiplier:1, roundId:0, history:[], online:0};
+ let player = null, bet = null, resultForRound = null, lastActivity = '';
+ let countdownTimer = null;
+ function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').classList.remove('show'),2600)}
+ function addActivity(left,right){const key=left+'|'+right;if(key===lastActivity)return;lastActivity=key;const el=document.createElement('div');el.className='activity-item';const a=document.createElement('span'),b=document.createElement('strong');a.textContent=left;b.textContent=right;el.append(a,b);$('activity').prepend(el);while($('activity').children.length>8)$('activity').lastElementChild.remove()}
+ function fmt(n){return Number(n||0).toLocaleString('en-US')}
+ function updatePotential(){const amount=Math.max(0,Number($('betAmount').value)||0);$('potential').textContent=fmt(Math.floor(amount*game.multiplier))+' credits'}
+ document.querySelectorAll('[data-amount]').forEach(b=>b.addEventListener('click',()=>{$('betAmount').value=b.dataset.amount;updatePotential()}));
+ $('betAmount').addEventListener('input',updatePotential);
+ function drawFlight(){
+  const m=game.multiplier||1;
+  const progress=Math.min(1,Math.log(Math.max(1,m))/Math.log(50));
+  const left=12+progress*65, bottom=17+progress*49;
+  $('plane').style.left=left+'%';$('plane').style.bottom=bottom+'%';
+  $('plane').style.transform=`rotate(${-12-progress*8}deg)`;
+  $('flare').style.left=`calc(${left}% - 5px)`;$('flare').style.bottom=`calc(${bottom}% + 26px)`;
+  $('trailPath').style.strokeDashoffset=700-progress*600;
+  $('trailGlow').style.opacity=.12+progress*.6;
+ }
+ function render(){
+  $('online').textContent=game.online||0;
+  $('multiplier').textContent=(game.multiplier||1).toFixed(2)+'×';
+  $('multiplier').className='multiplier '+game.phase;
+  $('status').textContent=game.phase==='running'?'PLANE IN FLIGHT':game.phase==='crashed'?'CRASHED':'NEXT ROUND';
+  $('roundText').textContent='Round #'+(game.roundId||0);
+  $('timerText').textContent=game.phase==='running'?'Cash out before the crash':game.phase==='crashed'?'Crashed at '+Number(game.crashPoint||1).toFixed(2)+'×':'Next takeoff soon';
+  $('history').replaceChildren();
+  if(!game.history||!game.history.length){const s=document.createElement('span');s.className='muted';s.textContent='Waiting for first round…';$('history').append(s)}
+  else game.history.forEach(item=>{const c=document.createElement('span');c.className='chip '+(item.crashPoint<2?'low':item.crashPoint<10?'mid':'high');c.textContent=Number(item.crashPoint).toFixed(2)+'×';$('history').append(c)});
+  $('balance').textContent=fmt(player?.balance||0);
+  $('pilotName').textContent=player?.name||'Connecting…';
+  $('betStatus').textContent=bet?(bet.status==='cashed_out'?`Cashed at ${bet.multiplier}×`:bet.status==='lost'?'Lost':`Active · ${fmt(bet.amount)} credits`):'No active bet';
+  const button=$('actionButton');
+  if(game.phase==='waiting'){
+   button.disabled=!player||!!bet;button.className='primary';button.textContent=bet?'BET PLACED':'PLACE BET';
+  }else if(game.phase==='running'&&bet&&bet.status==='active'){
+   button.disabled=false;button.className='primary cash';button.textContent='CASH OUT · '+fmt(Math.floor(bet.amount*game.multiplier));
+  }else{
+   button.disabled=true;button.className='primary';button.textContent=game.phase==='running'?'ROUND IN PROGRESS':'WAIT FOR NEXT ROUND';
+  }
+  updatePotential();drawFlight();
+ }
+ $('actionButton').addEventListener('click',()=>{
+  if(game.phase==='waiting'&&!bet){socket.emit('bet:place',{amount:Number($('betAmount').value)});}
+  else if(game.phase==='running'&&bet&&bet.status==='active'){socket.emit('bet:cashout');}
+ });
+ socket.on('connect',()=>{});
+ socket.on('game:state',s=>{
+  const oldRound=game.roundId;
+  game={...game,...s};
+  if(oldRound!==game.roundId){bet=null;resultForRound=null;}
+  if(game.phase==='crashed'&&resultForRound!==game.roundId){resultForRound=game.roundId;addActivity('Round #'+game.roundId+' crashed',Number(game.crashPoint).toFixed(2)+'×')}
+  render();
+ });
+ socket.on('player:state',p=>{player={...player,...p};if(p.bet)bet=p.bet;render()});
+ socket.on('bet:result',r=>{
+  bet={...(bet||{}),amount:r.amount,status:r.status,multiplier:r.multiplier,payout:r.payout};
+  if(player)player.balance=r.balance;
+  if(r.status==='cashed_out'){toast('Cashed out at '+r.multiplier+'× · '+fmt(r.payout)+' virtual credits');addActivity('You cashed out',r.multiplier+'× · +'+fmt(r.payout))}
+  else {toast('Bet lost. Better luck next round.');addActivity('Your bet lost',fmt(r.amount)+' credits')}
+  render();
+ });
+ socket.on('game:error',msg=>toast(msg));
+ render();
+})();
+</script>
+</body>
+</html>
