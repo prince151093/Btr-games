@@ -54,13 +54,41 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:8;display:flex;justify-content:space-around;gap:4px;padding:9px 8px calc(9px + env(safe-area-inset-bottom));background:#0b101beF;border-top:1px solid #ffffff16;backdrop-filter:blur(14px)}
 .nav-item{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:11px;padding:5px 2px;cursor:pointer}.nav-item b{display:block;font-size:18px;margin-bottom:2px}.nav-item.active{color:#ffd36c}
 #gameView{display:none}#gameView.open{display:block}.back-row{max-width:1100px;margin:10px auto 0;padding:0 16px} .back-btn{background:#1a263a;color:#dce7f8;border:1px solid var(--line);padding:8px 12px;border-radius:10px;font-weight:700}
-body.game-mode .lobby,body.game-mode .bottom-nav{display:none}body.game-mode #gameView{display:block}.game-online{display:none;max-width:1100px;margin:8px auto 0;padding:0 16px;text-align:right;color:var(--muted);font-size:12px}body.game-mode .game-online{display:block}body.game-mode header{position:relative}
+body.game-mode .lobby,body.game-mode .bottom-nav{display:none}body.game-mode #gameView{display:block}header .online{display:none}body.game-mode header .online{display:block}body.game-mode header{position:relative}
 @media(max-width:500px){.lobby{padding:14px 12px 90px}.game-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.game-card{padding:7px;border-radius:12px}.game-art{height:76px}.game-title{font-size:12px}.game-caption{font-size:10px}.coin-pill{padding:8px 9px}.coin-value{font-size:15px}.lobby-top .logo{font-size:18px}.game-card.add-card{min-height:130px}}
+
+
+.auth-screen{position:fixed;inset:0;z-index:100;background:radial-gradient(ellipse at 50% 0%,#1b2c49 0,#090d17 65%);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}.auth-card{width:min(100%,410px);padding:24px;background:linear-gradient(145deg,#141e30,#0e1523);border:1px solid #34445f;border-radius:20px;box-shadow:0 20px 70px #0008}.auth-title{font-size:25px;font-weight:950;margin:0 0 5px}.auth-sub{color:var(--muted);font-size:13px;margin-bottom:22px}.auth-label{display:block;color:#aebfd6;font-size:12px;margin:13px 0 6px}.auth-input{width:100%;height:48px;border:1px solid #30415d;border-radius:10px;background:#0a1120;color:white;padding:12px;font:inherit;outline:none}.auth-input:focus{border-color:#6385ba}.auth-switch{width:100%;border:0;background:transparent;color:#ffd36c;padding:14px 5px 0;font:inherit;cursor:pointer}.auth-error{color:#ff8996;font-size:12px;min-height:17px;margin-top:8px}.profile-screen{position:fixed;inset:0;z-index:90;background:#050914eF;display:none;align-items:center;justify-content:center;padding:18px}.profile-screen.show{display:flex}.profile-card{width:min(100%,420px);background:linear-gradient(145deg,#141e30,#0e1523);border:1px solid #34445f;border-radius:18px;padding:22px}.profile-row{padding:12px 0;border-bottom:1px solid #ffffff12}.profile-key{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.7px}.profile-val{font-weight:800;overflow-wrap:anywhere;margin-top:4px}.uid-note{font-size:11px;color:#8295b0;margin-top:5px}.hidden{display:none!important}
 
 </style>
 </head>
 <body>
-<header><div class="logo">CRASH<span>ZONE</span></div><div class="coin-pill" id="headerCoins"><span class="coin-icon">🪙</span><div><div class="coin-label">TOTAL COINS</div><div class="coin-value" id="lobbyBalance">1,000</div></div></div></header>
+
+<div class="auth-screen" id="authScreen">
+ <div class="auth-card">
+  <div class="logo" style="margin-bottom:20px">CRASH<span style="color:var(--red)">ZONE</span></div>
+  <h1 class="auth-title" id="authTitle">Welcome back</h1><div class="auth-sub" id="authSub">Log in to continue to CrashZone.</div>
+  <form id="authForm">
+   <label class="auth-label" for="authPhone">Phone number</label><input class="auth-input" id="authPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Enter phone number" required maxlength="18">
+   <label class="auth-label" for="authPassword">Password</label><input class="auth-input" id="authPassword" name="password" type="password" autocomplete="current-password" placeholder="At least 8 characters" required minlength="8" maxlength="128">
+   <div class="auth-error" id="authError" role="alert"></div>
+   <button class="primary" id="authSubmit" type="submit">Log In</button>
+  </form>
+  <button class="auth-switch" id="authSwitch" type="button">New to CrashZone? Create account</button>
+  <div class="lobby-note" style="text-align:center">No OTP required · Virtual credits only</div>
+ </div>
+</div>
+<div class="profile-screen" id="profileScreen" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+ <div class="profile-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 id="profileTitle" style="margin:0">Your Profile</h2><button class="small-btn" id="closeProfile" type="button" style="height:38px">Close</button></div>
+  <div class="profile-row"><div class="profile-key">Permanent UID</div><div class="profile-val" id="profileUid">—</div><div class="uid-note">Your UID cannot be changed.</div></div>
+  <div class="profile-row"><div class="profile-key">Phone number</div><div class="profile-val" id="profilePhone">—</div></div>
+  <form id="profileForm"><label class="auth-label" for="profileUsername">Username</label><input class="auth-input" id="profileUsername" maxlength="18" minlength="3" pattern="[A-Za-z0-9_]{3,18}" required><div class="uid-note">3–18 characters: letters, numbers, underscores.</div><div class="auth-error" id="profileError" role="alert"></div><button class="primary" type="submit">Save Username</button></form>
+  <button class="primary" id="logoutButton" type="button" style="background:#24334b;box-shadow:none;margin-top:10px">Log Out</button>
+ </div>
+</div>
+
+<header><div class="logo">CRASH<span>ZONE</span></div><div class="coin-pill" id="headerCoins"><span class="coin-icon">🪙</span><div><div class="coin-label">TOTAL COINS</div><div class="coin-value" id="lobbyBalance">1,000</div></div></div><div class="online">● <span id="online">0</span> pilots online</div></header>
 <section class="lobby" id="lobbyView">
  <div class="lobby-top"><div><div class="logo">GAME LOBBY</div><div class="lobby-kicker">Choose a game to play</div></div></div>
  <div class="lobby-heading"><span>All Games</span><span class="muted" style="font-size:12px;font-weight:600">1 available</span></div>
@@ -70,7 +98,7 @@ body.game-mode .lobby,body.game-mode .bottom-nav{display:none}body.game-mode #ga
  </div><div class="lobby-note">Virtual credits only. More games can be added to this grid later.</div>
 </section>
 <nav class="bottom-nav" id="bottomNav"><button class="nav-item active" type="button" data-nav="home"><b>⌂</b>Home</button><button class="nav-item" type="button" data-nav="activity"><b>◷</b>Activity</button><button class="nav-item" type="button" data-nav="wallet"><b>◈</b>Wallet</button><button class="nav-item" type="button" data-nav="account"><b>◎</b>Account</button></nav>
-<div id="gameView"><div class="back-row"><button class="back-btn" id="backToLobby" type="button">← Back to lobby</button></div><div class="game-online">● <span id="online">0</span> pilots online</div><main>
+<div id="gameView"><div class="back-row"><button class="back-btn" id="backToLobby" type="button">← Back to lobby</button></div><main>
 <section class="panel flight">
  <div class="sky-label">FLIGHT STATUS / LIVE ROUND</div><div id="status" class="status">CONNECTING</div>
  <div id="takeoffTimer" class="takeoff-timer">TAKEOFF IN <strong id="countdownValue">—</strong></div>
@@ -110,13 +138,14 @@ body.game-mode .lobby,body.game-mode .bottom-nav{display:none}body.game-mode #ga
   if(btn.dataset.nav==='home') back();
   else if(btn.dataset.nav==='activity') { open(); setTimeout(()=>document.querySelector('.activity')?.scrollIntoView({behavior:'smooth',block:'start'}),80); }
   else if(btn.dataset.nav==='wallet') { open(); setTimeout(()=>document.querySelector('.controls')?.scrollIntoView({behavior:'smooth',block:'start'}),80); }
-  else if(btn.dataset.nav==='account') { open(); setTimeout(()=>document.querySelector('.balance-line')?.scrollIntoView({behavior:'smooth',block:'start'}),80); }
+  else if(btn.dataset.nav==='account') { window.openProfile?.(); }
  }));
  const syncBalance=()=>{const v=document.getElementById('balance')?.textContent?.trim()||'1,000';['lobbyBalance'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=v;});};
  new MutationObserver(syncBalance).observe(document.getElementById('balance')||document.body,{childList:true,subtree:true,characterData:true}); syncBalance();
 })();
 
-(() => {
+function startGameSocket(){
+ (() => {
  const socket = io();
  const $ = id => document.getElementById(id);
  let game = {phase:'waiting', multiplier:1, roundId:0, history:[], online:0};
@@ -207,6 +236,23 @@ body.game-mode .lobby,body.game-mode .bottom-nav{display:none}body.game-mode #ga
  render();
  setInterval(()=>{if(game.phase!=='running')renderCountdownOnly()},100);
  function renderCountdownOnly(){const el=$('countdownValue');if(!el||game.phase==='running')return;const deadline=Number(game.nextRoundAt);const serverNow=Date.now()-serverOffset;const ms=Math.max(0,(Number.isFinite(deadline)?deadline:serverNow)-serverNow);const seconds=Math.max(0,Math.ceil(ms/1000));const next=String(seconds);if(el.textContent!==next)el.textContent=next;}
+ })();
+}
+
+// Account UI: API sessions are cookie-based; passwords never leave the server as stored plaintext.
+(()=>{
+ const $=id=>document.getElementById(id); let signupMode=false, currentUser=null, socketStarted=false;
+ async function api(url,options={}){const r=await fetch(url,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||'Something went wrong.');return data;}
+ function showAuth(){ $('authScreen').classList.remove('hidden'); $('profileScreen').classList.remove('show'); document.body.classList.remove('game-mode'); }
+ function showApp(user){currentUser=user;$('authScreen').classList.add('hidden');$('profileUid').textContent=user.uid;$('profilePhone').textContent=user.phone;$('profileUsername').value=user.username;$('lobbyBalance').textContent=Number(user.balance||0).toLocaleString('en-US');$('balance').textContent=Number(user.balance||0).toLocaleString('en-US');if(!socketStarted){socketStarted=true;startGameSocket();}}
+ function updateAuthMode(){ $('authTitle').textContent=signupMode?'Create your account':'Welcome back';$('authSub').textContent=signupMode?'Register with your phone number and password. No OTP needed.':'Log in to continue to CrashZone.';$('authSubmit').textContent=signupMode?'Create Account':'Log In';$('authPassword').autocomplete=signupMode?'new-password':'current-password';$('authPassword').placeholder=signupMode?'Create a strong password':'Enter your password';$('authSwitch').textContent=signupMode?'Already have an account? Log in':'New to CrashZone? Create account';$('authError').textContent='';$('authPassword').minLength=signupMode?8:1;}
+ $('authSwitch').addEventListener('click',()=>{signupMode=!signupMode;updateAuthMode()});
+ $('authForm').addEventListener('submit',async e=>{e.preventDefault();$('authSubmit').disabled=true;$('authError').textContent='';try{const data=await api(signupMode?'/api/auth/signup':'/api/auth/login',{method:'POST',body:JSON.stringify({phone:$('authPhone').value,password:$('authPassword').value})});showApp(data.user);$('authPassword').value='';}catch(err){$('authError').textContent=err.message;}finally{$('authSubmit').disabled=false;}});
+ window.openProfile=()=>{if(!currentUser)return; $('profileUid').textContent=currentUser.uid;$('profilePhone').textContent=currentUser.phone;$('profileUsername').value=currentUser.username;$('profileError').textContent='';$('profileScreen').classList.add('show');};
+ $('closeProfile').addEventListener('click',()=>$('profileScreen').classList.remove('show'));$('profileScreen').addEventListener('click',e=>{if(e.target===$('profileScreen'))$('profileScreen').classList.remove('show')});
+ $('profileForm').addEventListener('submit',async e=>{e.preventDefault();$('profileError').textContent='';try{const data=await api('/api/auth/profile',{method:'PATCH',body:JSON.stringify({username:$('profileUsername').value})});currentUser=data.user;$('profileUsername').value=currentUser.username;$('profileError').style.color='var(--green)';$('profileError').textContent='Username saved.';$('profileError').style.color='';}catch(err){$('profileError').textContent=err.message;}});
+ $('logoutButton').addEventListener('click',async()=>{try{await api('/api/auth/logout',{method:'POST',body:'{}'});}catch(_){}if(socketStarted){location.reload();return;}currentUser=null;showAuth();});
+ api('/api/auth/me').then(data=>{if(data.user)showApp(data.user);else showAuth();}).catch(()=>showAuth());updateAuthMode();
 })();
 </script>
 </body>
