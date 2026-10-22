@@ -129,15 +129,15 @@ app.get('/health', (_req, res) => res.json({
 }));
 app.get('/', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
-const WAIT_MS = 12000;
+const WAIT_MS = 15000;
 const TICK_MS = 100;
 const MAX_BET = 1000;
 const STARTING_CREDITS = 1000;
 const players = new Map();
 const bets = new Map();
 const miniGames = new Map();
-const MINI_BET_WINDOW_MS = 10000;
-const MINI_ROUND_MS = 12000;
+const MINI_BET_WINDOW_MS = 15000;
+const MINI_ROUND_MS = 15000;
 const MINI_MAX_BET = 1000;
 const MINI_CONFIG = { bigsmall: { payout: 1.9 }, color: { payout: 7 }, lucky: { payout: 8 } };
 function randomMiniResult(type) {
@@ -147,7 +147,7 @@ function randomMiniResult(type) {
 }
 function miniSnapshot(type) {
   const g = miniGames.get(type);
-  return { type, roundId: g.roundId, phase: Date.now() < g.closesAt ? 'open' : 'revealing', closesAt: g.closesAt, revealAt: g.revealAt, serverTime: Date.now(), result: g.resultVisible ? g.result : null, history: g.history.slice(0, 500) };
+  return { type, roundId: g.roundId, phase: Date.now() < g.closesAt ? 'open' : 'revealing', closesAt: g.closesAt, revealAt: g.revealAt, serverTime: Date.now(), result: g.resultVisible ? g.result : null, history: g.history.slice(0, 100) };
 }
 function broadcastMini(type) { io.emit('mini:state', miniSnapshot(type)); }
 function startMiniRound(type) {
@@ -162,7 +162,7 @@ setInterval(() => {
   for (const type of Object.keys(MINI_CONFIG)) {
     let g = miniGames.get(type);
     if (now >= g.revealAt && !g.resultVisible) {
-      g.resultVisible = true; g.history.unshift({ roundId: g.roundId, result: g.result }); g.history = g.history.slice(0, 500);
+      g.resultVisible = true; g.history.unshift({ roundId: g.roundId, result: g.result }); g.history = g.history.slice(0, 100);
       for (const [socketId, wagers] of g.wagers) {
         const player = players.get(socketId); if (!player) continue;
         for (const wager of wagers) {
@@ -235,7 +235,7 @@ function snapshot() {
   return {
     phase: state.phase, roundId: state.roundId, multiplier: state.multiplier,
     crashPoint: state.crashPoint, roundStartedAt: state.roundStartedAt,
-    nextRoundAt: state.nextRoundAt, history: state.history.slice(0, 12),
+    nextRoundAt: state.nextRoundAt, history: state.history.slice(0, 100),
     online: state.online,
     players: [...players.values()].map(publicPlayer),
     myBetState: null,
@@ -288,7 +288,7 @@ function finishRound(point) {
   state.multiplier = Number(point.toFixed(2));
   state.crashPoint = state.multiplier;
   state.history.unshift({ roundId: state.roundId, crashPoint: state.crashPoint });
-  state.history = state.history.slice(0, 12);
+  state.history = state.history.slice(0, 100);
   state.nextRoundAt = Date.now() + WAIT_MS;
   targetCrashAtMs = null;
   for (const [id, bet] of bets) {
