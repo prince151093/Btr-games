@@ -33,15 +33,29 @@ let state = {
 let targetCrashAtMs = null;
 
 function randomCrashPoint() {
-  // Demo-only outcome distribution. This is not a certified or audited gambling RNG.
-  const r = crypto.randomInt(0, 10000) / 10000;
-  let value;
-  if (r < 0.10) value = 1 + crypto.randomInt(0, 20) / 100;
-  else if (r < 0.60) value = 1.2 + Math.random() * 0.8;
-  else if (r < 0.82) value = 2 + Math.random() * 1;
-  else if (r < 0.96) value = 3 + Math.random() * 7;
-  else value = 10 + Math.random() * 40;
-  return Math.max(1, Math.round(value * 100) / 100);
+  // Demo-only weighted outcome table. Supplied weights total 105, so they are
+  // treated as relative weights and normalized across 105 tickets.
+  // The requested ranges leave 3.00x–4.00x and 1.01x–1.19x unassigned.
+  const buckets = [
+    { weight: 10, min: 1.00, max: 1.00 },
+    { weight: 15, min: 1.20, max: 1.40 },
+    { weight: 15, min: 1.40, max: 1.60 },
+    { weight: 40, min: 1.60, max: 2.00 },
+    { weight: 10, min: 2.00, max: 3.00 },
+    { weight: 10, min: 4.00, max: 10.00 },
+    { weight: 3, min: 10.00, max: 50.00 },
+    { weight: 2, min: 50.00, max: 100.00 }
+  ];
+  const totalWeight = buckets.reduce((sum, bucket) => sum + bucket.weight, 0);
+  let ticket = crypto.randomInt(0, totalWeight);
+  let selected = buckets[buckets.length - 1];
+  for (const bucket of buckets) {
+    if (ticket < bucket.weight) { selected = bucket; break; }
+    ticket -= bucket.weight;
+  }
+  if (selected.min === selected.max) return selected.min;
+  const value = selected.min + Math.random() * (selected.max - selected.min);
+  return Math.round(value * 100) / 100;
 }
 function elapsedForMultiplier(m) {
   // Exponential-style growth; shared server timeline determines crash and cash-out.
