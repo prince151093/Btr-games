@@ -25,7 +25,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
 .field-label{display:block;color:#9fb1cb;font-size:12px;margin:0 0 7px}.bet-row{display:flex;gap:8px}.bet-input{min-width:0;flex:1;background:#0a1120;border:1px solid #30415d;border-radius:10px;padding:13px;color:white;font-size:16px;outline:none}.bet-input:focus{border-color:#6385ba}
 .small-btn,.primary{border:0;border-radius:10px;font-weight:800;cursor:pointer;transition:filter .15s,transform .15s}.small-btn{background:#24334b;color:#e4edf9;padding:0 12px}.small-btn:hover,.primary:hover{filter:brightness(1.12)}button:disabled{opacity:.42;cursor:not-allowed}
 .primary{width:100%;margin-top:12px;padding:15px;background:linear-gradient(135deg,#ff5366,#dc253e);color:white;font-size:16px;box-shadow:0 7px 20px #ed294533}.primary.cash{background:linear-gradient(135deg,#37e6a0,#13b978);color:#061a12;box-shadow:0 7px 20px #19ca8433}
-.return-line{display:flex;justify-content:space-between;margin-top:13px;font-size:13px}.return-line strong{color:var(--green)}
+.return-line{display:flex;justify-content:space-between;margin-top:13px;font-size:13px}.auto-row{display:flex;align-items:center;gap:10px;margin-top:13px;color:#9fb1cb;font-size:13px}.auto-row input{width:18px;height:18px;accent-color:#ff4259}.auto-input{width:100px;background:#0a1120;border:1px solid #30415d;border-radius:8px;padding:8px;color:white}.return-line strong{color:var(--green)}
 .history-wrap{grid-column:1/-1;padding:16px 18px}.section-title{font-size:14px;font-weight:800;letter-spacing:.5px;margin-bottom:13px}.history{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:8px 12px;border-radius:999px;background:#273247;color:#d9e4f4;font-size:13px;font-weight:800}.chip.low{background:#42202c;color:#ff8996}.chip.mid{background:#263b37;color:#6fe7b1}.chip.high{background:#293554;color:#9bb9ff}
 .activity{grid-column:1/-1;padding:16px 18px}.activity-list{display:grid;gap:8px;max-height:170px;overflow:auto}.activity-item{display:flex;justify-content:space-between;padding:9px 10px;background:#0b1321;border-radius:8px;color:#aebfd6;font-size:13px}.activity-item strong{color:#f5f7fb}
 .toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#26344a;border:1px solid #415777;border-radius:10px;padding:12px 16px;z-index:10;transition:.2s;max-width:90vw}.toast.show{opacity:1;transform:translate(-50%,0)}.disclaimer{text-align:center;color:#71839e;font-size:11px;padding:0 16px 22px}
@@ -48,6 +48,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
   <div class="balance-line"><div><div class="muted" style="font-size:12px">YOUR VIRTUAL BALANCE</div><div class="balance"><span id="balance">1,000</span> <span style="font-size:12px;color:#9baec8">credits</span></div></div><div class="muted" style="font-size:12px;text-align:right">PILOT<br><strong id="pilotName" style="color:#fff">Connecting…</strong></div></div>
   <label class="field-label" for="betAmount">BET AMOUNT (VIRTUAL CREDITS)</label>
   <div class="bet-row"><input id="betAmount" class="bet-input" type="number" min="1" max="1000" step="1" value="100"><button class="small-btn" data-amount="50">50</button><button class="small-btn" data-amount="100">100</button><button class="small-btn" data-amount="250">250</button></div>
+  <div class="auto-row"><label for="autoCashout">Auto cash-out at ×</label><input id="autoCashout" class="auto-input" type="number" min="1.01" max="100" step="0.01" placeholder="Off"><span class="muted">Optional</span></div>
   <button id="actionButton" class="primary" disabled>CONNECTING…</button>
   <div class="return-line"><span class="muted">Potential return</span><strong id="potential">100 credits</strong></div>
   <div class="return-line"><span class="muted">Your current bet</span><span id="betStatus">No active bet</span></div>
@@ -96,8 +97,8 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
   $('pilotName').textContent=player?.name||'Connecting…';
   $('betStatus').textContent=bet?(bet.status==='cashed_out'?`Cashed at ${bet.multiplier}×`:bet.status==='lost'?'Lost':`Active · ${fmt(bet.amount)} credits`):'No active bet';
   const button=$('actionButton');
-  if(game.phase==='waiting'){
-   button.disabled=!player||!!bet;button.className='primary';button.textContent=bet?'BET PLACED':'PLACE BET';
+  if(game.phase==='waiting'||game.phase==='crashed'){
+   const canPlace=!bet||bet.status!=='active';button.disabled=!player||!canPlace;button.className='primary';button.textContent=canPlace?(game.phase==='crashed'?'PLACE NEXT BET':'PLACE BET'):'BET PLACED';
   }else if(game.phase==='running'&&bet&&bet.status==='active'){
    button.disabled=false;button.className='primary cash';button.textContent='CASH OUT · '+fmt(Math.floor(bet.amount*game.multiplier));
   }else{
@@ -106,14 +107,14 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
   updatePotential();drawFlight();
  }
  $('actionButton').addEventListener('click',()=>{
-  if(game.phase==='waiting'&&!bet){socket.emit('bet:place',{amount:Number($('betAmount').value)});}
+  if((game.phase==='waiting'||game.phase==='crashed')&&(!bet||bet.status!=='active')){const autoRaw=$('autoCashout').value.trim();const autoCashout=autoRaw?Number(autoRaw):null; if(autoCashout!==null&&(!Number.isFinite(autoCashout)||autoCashout<1.01||autoCashout>100)){toast('Auto cash-out must be between 1.01× and 100×.');return;} socket.emit('bet:place',{amount:Number($('betAmount').value),autoCashout});}
   else if(game.phase==='running'&&bet&&bet.status==='active'){socket.emit('bet:cashout');}
  });
  socket.on('connect',()=>{});
  socket.on('game:state',s=>{
   const oldRound=game.roundId;
   game={...game,...s};
-  if(oldRound!==game.roundId){bet=null;resultForRound=null;}
+  if(oldRound!==game.roundId){resultForRound=null; /* keep the countdown bet for the round taking off */ }
   if(game.phase==='crashed'&&resultForRound!==game.roundId){resultForRound=game.roundId;addActivity('Round #'+game.roundId+' crashed',Number(game.crashPoint).toFixed(2)+'×')}
   render();
  });
@@ -121,7 +122,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
  socket.on('bet:result',r=>{
   bet={...(bet||{}),amount:r.amount,status:r.status,multiplier:r.multiplier,payout:r.payout};
   if(player)player.balance=r.balance;
-  if(r.status==='cashed_out'){toast('Cashed out at '+r.multiplier+'× · '+fmt(r.payout)+' virtual credits');addActivity('You cashed out',r.multiplier+'× · +'+fmt(r.payout))}
+  if(r.status==='cashed_out'){toast((r.automatic?'Auto cashed out':'Cashed out')+' at '+r.multiplier+'× · '+fmt(r.payout)+' virtual credits');addActivity(r.automatic?'Auto cash-out':'You cashed out',r.multiplier+'× · +'+fmt(r.payout))}
   else {toast('Bet lost. Better luck next round.');addActivity('Your bet lost',fmt(r.amount)+' credits')}
   render();
  });
