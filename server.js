@@ -69,6 +69,34 @@ function authRequired(req, res, next) {
   if (!user) return res.status(401).json({ error: 'Please log in to continue.' });
   req.account = user; next();
 }
+
+// Separate owner-admin session. Credentials are configured only in server environment.
+const adminSessions = new Map();
+function safeStringEqual(a, b) {
+  const aa = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
+}
+function adminRequired(req, res, next) {
+  const token = parseCookies(req.headers.cookie).cz_admin;
+  const session = token && adminSessions.get(token);
+  if (!session || Date.now() - session.createdAt > 8 * 60 * 60 * 1000) {
+    if (token) adminSessions.delete(token);
+    res.setHeader('Set-Cookie', 'cz_admin=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+    return res.status(401).json({ error: 'Admin login required. Please sign in again.' });
+  }
+  req.admin = { username: process.env.ADMIN_USERNAME };
+  next();
+}
+function writeLedger(entry) {
+  // Requires the SQL migration in admin/supabase-admin.sql. Never blocks gameplay.
+  void supabase.from('crashzone_admin_ledger').insert({
+    game: entry.game, round_id: String(entry.roundId), user_id: entry.userId,
+    username: entry.username || null, entry_type: entry.entryType,
+    amount: Math.max(0, Math.floor(Number(entry.amount) || 0)),
+    details: entry.details || {}
+  }).then(({ error }) => { if (error) console.error('Admin ledger write failed:', error.message); });
+}
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
   return { salt, hash: crypto.scryptSync(password, salt, 64).toString('hex') };
 }
@@ -124,6 +152,69 @@ app.patch('/api/auth/profile', authRequired, async (req, res) => {
   for (const [socketId, player] of players) if (player.userId === req.account.id) { player.name = username; const sock = io.sockets.sockets.get(socketId); if (sock) sendPlayer(sock); }
   broadcast(); res.json({ user: publicAccount(req.account) });
 });
+
+// Admin login and reporting API
+app.post('/api/admin/login', (req, res) => {
+  const username = String(req.body?.username || '');
+  const password = String(req.body?.password || '');
+  const configuredUser = process.env.ADMIN_USERNAME;
+  const configuredPass = process.env.ADMIN_PASSWORD;
+  if (!configuredUser || !configuredPass) return res.status(503).json({ error: 'Admin login is not configured. Set ADMIN_USERNAME and ADMIN_PASSWORD in server environment.' });
+  if (!safeStringEqual(username, configuredUser) || !safeStringEqual(password, configuredPass)) {
+    return res.status(401).json({ error: 'Incorrect admin username or password.' });
+  }
+  const token = crypto.randomBytes(32).toString('hex');
+  adminSessions.set(token, { createdAt: Date.now() });
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `cz_admin=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${secure}`);
+  res.json({ ok: true, username: configuredUser });
+});
+app.post('/api/admin/logout', adminRequired, (req, res) => {
+  const token = parseCookies(req.headers.cookie).cz_admin;
+  if (token) adminSessions.delete(token);
+  res.setHeader('Set-Cookie', 'cz_admin=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+  res.json({ ok: true });
+});
+app.get('/api/admin/me', adminRequired, (req, res) => res.json({ username: req.admin.username }));
+app.get('/api/admin/overview', adminRequired, async (req, res) => {
+  const { data: ledger, error } = await supabase.from('crashzone_admin_ledger')
+    .select('game,entry_type,amount,created_at,round_id,user_id,username,details').order('created_at', { ascending: false }).limit(10000);
+  if (error) return res.status(503).json({ error: 'P&L ledger is unavailable. Run admin/supabase-admin.sql in Supabase SQL Editor first.' });
+  const byGame = {};
+  for (const game of ['aviator','bigsmall','color','lucky']) byGame[game] = { stakes: 0, payouts: 0, refunds: 0, entries: 0, rounds: new Set() };
+  for (const row of ledger || []) {
+    const g = byGame[row.game]; if (!g) continue;
+    g.entries++;
+    if (row.round_id) g.rounds.add(row.round_id);
+    if (row.entry_type === 'stake') g.stakes += Number(row.amount) || 0;
+    if (row.entry_type === 'payout') g.payouts += Number(row.amount) || 0;
+    if (row.entry_type === 'refund') g.refunds += Number(row.amount) || 0;
+  }
+  const games = Object.fromEntries(Object.entries(byGame).map(([k,v]) => [k, { stakes:v.stakes, payouts:v.payouts, refunds:v.refunds, net:v.stakes-v.payouts-v.refunds, entries:v.entries, rounds:v.rounds.size }]));
+  res.json({ userCount: database.users.length, online: players.size, virtualCreditsInAccounts: database.users.reduce((n,u)=>n+(Number(u.balance)||0),0), games, ledger: (ledger||[]).slice(0,250), current: { aviator: { phase: state.phase, roundId: state.roundId, multiplier: state.multiplier }, mini: Object.fromEntries([...miniGames].map(([k,g])=>[k,{roundId:g.roundId,phase:Date.now()<g.closesAt?'open':'revealing'}])) } });
+});
+app.get('/api/admin/users', adminRequired, (req, res) => {
+  const q = String(req.query.q || '').toLowerCase().slice(0,100);
+  const users = database.users.filter(u => !q || [u.username,u.phone,u.uid,String(u.userNumber)].some(v=>String(v||'').toLowerCase().includes(q)))
+    .slice(0,500).map(u => ({ id:u.id, username:u.username, phone:u.phone, uid:u.uid, userNumber:u.userNumber, balance:u.balance, createdAt:u.createdAt }));
+  res.json({ users });
+});
+app.post('/api/admin/users/:id/adjust-balance', adminRequired, async (req, res) => {
+  const user = database.users.find(u=>u.id===req.params.id);
+  if (!user) return res.status(404).json({error:'User not found.'});
+  const amount = Number(req.body?.amount);
+  const reason = String(req.body?.reason||'').trim().slice(0,200);
+  if (!Number.isSafeInteger(amount) || amount===0 || Math.abs(amount)>100000000 || !reason) return res.status(400).json({error:'Enter a non-zero whole-credit adjustment and a reason.'});
+  if (user.balance + amount < 0) return res.status(400).json({error:'Adjustment cannot make the balance negative.'});
+  user.balance += amount;
+  await saveUser(user);
+  writeLedger({game:'admin',roundId:'manual',userId:user.id,username:user.username,entryType:amount>0?'bonus':'adjustment',amount:Math.abs(amount),details:{reason,delta:amount,admin:req.admin.username}});
+  for (const p of players.values()) if(p.userId===user.id){p.balance=user.balance;const sock=io.sockets.sockets.get(p.id);if(sock)sendPlayer(sock);}
+  broadcast();
+  res.json({ok:true,balance:user.balance});
+});
+app.get('/admin', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
+
 app.get('/health', (_req, res) => res.json({
   status: 'ok', game: 'CrashZone Aviator', phase: state.phase, round: state.roundId
 }));
@@ -176,6 +267,7 @@ setInterval(() => {
           const multiplier = isDigitPick ? 8 / Math.max(1, exactNumberCount) : type === 'bigsmall' && wager.pick === 'violet' ? 4.5 : type === 'bigsmall' && ['green','red'].includes(wager.pick) ? 1.9 : MINI_CONFIG[type].payout;
           const payout = won ? Math.floor(wager.amount * multiplier) : 0;
           player.balance += payout; wager.settled = true; wager.status = won ? 'won' : 'lost'; wager.payout = payout;
+          if (payout > 0) writeLedger({game:type,roundId:g.roundId,userId:player.userId,username:player.name,entryType:'payout',amount:payout,details:{pick:wager.pick,result:g.result,multiplier}});
           io.to(socketId).emit('mini:result', { type, roundId: g.roundId, pick: wager.pick, result: g.result, amount: wager.amount, won, payout, balance: player.balance, multiplier });
         }
         persistBalance(player); const sock = io.sockets.sockets.get(socketId); if (sock) sendPlayer(sock);
@@ -273,6 +365,7 @@ function cashoutPlayer(id, multiplier, automatic = false) {
   bet.payout = payout;
   bet.automatic = automatic;
   current.balance += payout;
+  writeLedger({game:'aviator',roundId:bet.roundId,userId:current.userId,username:current.name,entryType:'payout',amount:payout,details:{multiplier:safeMultiplier,automatic}});
   persistBalance(current);
   io.to(id).emit('bet:result', {
     status: 'cashed_out', amount: bet.amount, multiplier: bet.multiplier,
@@ -342,7 +435,9 @@ io.on('connection', socket => {
     if (!Number.isInteger(amount) || amount < 1 || amount > MINI_MAX_BET) return socket.emit('game:error', `Each bid must be 1–${MINI_MAX_BET} virtual credits.`);
     const total = amount * picks.length;
     if (total > current.balance) return socket.emit('game:error', `Not enough virtual credits for ${picks.length} bids (${total} total).`);
-    current.balance -= total; persistBalance(current);
+    current.balance -= total;
+    for (const pick of picks) writeLedger({game:type,roundId:g.roundId,userId:current.userId,username:current.name,entryType:'stake',amount,details:{pick}});
+    persistBalance(current);
     const wagers = g.wagers.get(socket.id) || [];
     picks.forEach(pick => wagers.push({ amount, pick, settled: false })); g.wagers.set(socket.id, wagers);
     socket.emit('mini:bet:accepted', { type, roundId: g.roundId, amount, total, picks, balance: current.balance });
@@ -367,6 +462,7 @@ io.on('connection', socket => {
     }
     if (amount > current.balance) return socket.emit('game:error', 'Not enough virtual credits.');
     current.balance -= amount;
+    writeLedger({game:'aviator',roundId:previousBet && previousBet.status==='active' ? previousBet.roundId : state.roundId+1,userId:current.userId,username:current.name,entryType:'stake',amount,details:{kind:'aviator_bet'}});
     persistBalance(current);
     if (previousBet && previousBet.status === 'active') {
       previousBet.amount += amount;
