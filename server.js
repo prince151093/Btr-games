@@ -168,11 +168,12 @@ setInterval(() => {
         for (const wager of wagers) {
           if (wager.settled) continue;
           const isDigitPick = type === 'bigsmall' && /^[0-9]$/.test(wager.pick);
-          const won = type === 'bigsmall' ? (isDigitPick ? Number(wager.pick) === g.result : wager.pick === 'big' ? g.result >= 5 : g.result <= 4) : wager.pick === String(g.result);
+          const resultColor = g.result === 0 ? 'red' : g.result === 5 ? 'green' : (g.result % 2 === 1 ? 'green' : 'red');
+          const won = type === 'bigsmall' ? (isDigitPick ? Number(wager.pick) === g.result : wager.pick === 'big' ? g.result >= 5 : wager.pick === 'small' ? g.result <= 4 : wager.pick === 'violet' ? (g.result === 0 || g.result === 5) : ['green','red'].includes(wager.pick) ? resultColor === wager.pick : false) : wager.pick === String(g.result);
           const exactNumberCount = type === 'bigsmall' ? wagers.filter(w => /^[0-9]$/.test(w.pick)).length : 0;
           // Fair, transparent gross-return multipliers: 8 / number of exact digits selected.
           // Side bets (BIG/SMALL) do not change the exact-number multiplier.
-          const multiplier = isDigitPick ? 8 / Math.max(1, exactNumberCount) : MINI_CONFIG[type].payout;
+          const multiplier = isDigitPick ? 8 / Math.max(1, exactNumberCount) : type === 'bigsmall' && wager.pick === 'violet' ? 4.5 : type === 'bigsmall' && ['green','red'].includes(wager.pick) ? 1.9 : MINI_CONFIG[type].payout;
           const payout = won ? Math.floor(wager.amount * multiplier) : 0;
           player.balance += payout; wager.settled = true; wager.status = won ? 'won' : 'lost'; wager.payout = payout;
           io.to(socketId).emit('mini:result', { type, roundId: g.roundId, pick: wager.pick, result: g.result, amount: wager.amount, won, payout, balance: player.balance, multiplier });
@@ -332,7 +333,7 @@ io.on('connection', socket => {
     if (!g || !MINI_CONFIG[type]) return socket.emit('game:error', 'Unknown game.');
     if (Date.now() >= g.closesAt || g.resultVisible) return socket.emit('game:error', 'Betting is closed for this round.');
     const picks = [...new Set((Array.isArray(raw.picks) ? raw.picks : [raw.pick]).map(v => String(v)))];
-    const validPick = pick => type === 'bigsmall' ? (['big','small'].includes(pick) || /^[0-9]$/.test(pick)) : type === 'color' ? ['blue','green','yellow','red','pink','violet','black','orange'].includes(pick) : /^[0-9]$/.test(pick);
+    const validPick = pick => type === 'bigsmall' ? (['big','small','green','red','violet'].includes(pick) || /^[0-9]$/.test(pick)) : type === 'color' ? ['blue','green','yellow','red','pink','violet','black','orange'].includes(pick) : /^[0-9]$/.test(pick);
     if (!picks.length || picks.some(pick => !validPick(pick))) return socket.emit('game:error', 'Choose valid options.');
     const existingWagers = g.wagers.get(socket.id) || [];
     if (picks.some(pick => existingWagers.some(w => w.pick === pick))) return socket.emit('game:error', 'You already placed a bid on one of these options this round.');
