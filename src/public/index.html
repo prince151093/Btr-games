@@ -53,7 +53,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
  <div class="controls">
   <div class="balance-line"><div><div class="muted" style="font-size:12px">YOUR VIRTUAL BALANCE</div><div class="balance"><span id="balance">1,000</span> <span style="font-size:12px;color:#9baec8">credits</span></div></div><div class="muted" style="font-size:12px;text-align:right">PILOT<br><strong id="pilotName" style="color:#fff">Connecting…</strong></div></div>
   <label class="field-label" for="betAmount">BET AMOUNT (VIRTUAL CREDITS)</label>
-  <div class="bet-row"><input id="betAmount" class="bet-input" type="number" min="1" max="1000" step="1" value="100"><button class="small-btn" data-amount="50">50</button><button class="small-btn" data-amount="100">100</button><button class="small-btn" data-amount="250">250</button></div>
+  <div class="bet-row"><input id="betAmount" class="bet-input" type="number" min="1" max="1000" step="1" value="100"><button class="small-btn" data-amount="10">10</button><button class="small-btn" data-amount="20">20</button><button class="small-btn" data-amount="50">50</button><button class="small-btn" data-amount="100">100</button></div>
   <div class="auto-row"><label for="autoCashout">Auto cash-out at ×</label><input id="autoCashout" class="auto-input" type="number" min="1.01" max="100" step="0.01" placeholder="Off"><span class="muted">Optional</span></div>
   <button id="actionButton" class="primary" disabled>CONNECTING…</button>
   <div class="return-line"><span class="muted">Potential return</span><strong id="potential">100 credits</strong></div>
@@ -71,10 +71,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
  const socket = io();
  const $ = id => document.getElementById(id);
  let game = {phase:'waiting', multiplier:1, roundId:0, history:[], online:0};
- let player = null, bet = null, resultForRound = null, lastActivity = '';
- let countdownTimer = null;
- let serverOffset = 0;
- // Simulated display count for demo UI; this is not the actual connected-player total.
+ // Simulated demo display only; this is not the actual connected-player count.
  let simulatedOnline = 300 + Math.floor(Math.random() * 201);
  setInterval(() => {
   let next;
@@ -82,6 +79,9 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
   simulatedOnline = next;
   $('online').textContent = String(simulatedOnline);
  }, 3000);
+ let player = null, bet = null, resultForRound = null, lastActivity = '';
+ let countdownTimer = null;
+ let serverOffset = 0;
  function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>$('toast').classList.remove('show'),2600)}
  function addActivity(left,right){const key=left+'|'+right;if(key===lastActivity)return;lastActivity=key;const el=document.createElement('div');el.className='activity-item';const a=document.createElement('span'),b=document.createElement('strong');a.textContent=left;b.textContent=right;el.append(a,b);$('activity').prepend(el);while($('activity').children.length>8)$('activity').lastElementChild.remove()}
  function fmt(n){return Number(n||0).toLocaleString('en-US')}
