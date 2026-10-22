@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <title>CrashZone — Shared Multiplier</title>
+  <style>
+    :root{color-scheme:dark;--bg:#090e1c;--panel:#111a2e;--line:#263450;--text:#eef4ff;--muted:#98a9c7;--green:#5cf2b1;--red:#ff637d;--blue:#78a9ff}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#17264a 0,#090e1c 55%);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--text);display:flex;justify-content:center;padding:22px 14px}
+    main{width:min(760px,100%)}header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}.brand{font-size:1.25rem;font-weight:900;letter-spacing:.09em}.brand span{color:var(--green)}.status{font-size:.78rem;color:var(--muted);display:flex;align-items:center;gap:7px}.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px #5cf2b188}.panel{background:linear-gradient(150deg,#141f37,#0f1729);border:1px solid var(--line);border-radius:22px;padding:clamp(18px,5vw,34px);box-shadow:0 20px 60px #0005}.topline{display:flex;justify-content:space-between;gap:12px;align-items:center;color:var(--muted);font-size:.85rem}.pill{border:1px solid var(--line);padding:7px 11px;border-radius:999px;white-space:nowrap}.multiplier{font-size:clamp(3.5rem,16vw,7rem);font-weight:900;line-height:1.15;text-align:center;letter-spacing:-.06em;margin:30px 0 8px;color:var(--green);font-variant-numeric:tabular-nums;text-shadow:0 0 35px #5cf2b122;transition:color .2s}.multiplier.crashed{color:var(--red);text-shadow:0 0 35px #ff637d22}.message{text-align:center;min-height:26px;color:var(--muted);font-size:.95rem}.track{height:8px;border-radius:10px;background:#202d47;overflow:hidden;margin:26px 0 22px}.track>div{height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:10px;transition:width .1s linear}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stat{background:#0b1325;border:1px solid #202d47;border-radius:14px;padding:13px;text-align:center}.stat small{display:block;color:var(--muted);font-size:.75rem;margin-bottom:5px}.stat strong{font-size:1.05rem;font-variant-numeric:tabular-nums}.history-panel{margin-top:16px;background:#0d1527;border:1px solid var(--line);border-radius:18px;padding:17px}.history-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.history-head h2{font-size:1rem;margin:0}.history{display:flex;flex-wrap:wrap;gap:8px}.chip{padding:8px 11px;border-radius:10px;background:#18233a;border:1px solid #293955;font-weight:750;font-size:.85rem}.chip.low{color:var(--red)}.chip.high{color:var(--green)}.note{color:var(--muted);font-size:.78rem;line-height:1.5;margin:16px 2px 0}.timings{margin-top:16px;border:1px solid var(--line);border-radius:16px;padding:15px;background:#0d1527}.timings h2{font-size:.95rem;margin:0 0 10px}.timing-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.timing{padding:10px;background:#131e34;border-radius:10px;font-size:.82rem;display:flex;justify-content:space-between;gap:8px}.timing b{color:var(--blue)}footer{text-align:center;color:#6f819f;font-size:.75rem;margin:18px 0 4px}@media(max-width:420px){.stats{gap:6px}.stat{padding:10px 5px}.timing-grid{grid-template-columns:1fr}.panel{border-radius:18px}}
+  </style>
+</head>
+<body>
+<main>
+  <header><div class="brand">CRASH<span>ZONE</span></div><div class="status"><i class="dot"></i><span id="connection">Connecting…</span></div></header>
+  <section class="panel" aria-live="polite">
+    <div class="topline"><span id="round">ROUND —</span><span class="pill" id="phase">CONNECTING</span></div>
+    <div id="multiplier" class="multiplier">1.00×</div>
+    <div id="message" class="message">Connecting to shared game server…</div>
+    <div class="track"><div id="progress"></div></div>
+    <div class="stats">
+      <div class="stat"><small>PLAYERS ONLINE</small><strong id="online">—</strong></div>
+      <div class="stat"><small>ROUND TIMER</small><strong id="timer">—</strong></div>
+      <div class="stat"><small>LAST CRASH</small><strong id="lastCrash">—</strong></div>
+    </div>
+  </section>
+  <section class="history-panel"><div class="history-head"><h2>Recent crash results</h2><span class="status">Shared live history</span></div><div class="history" id="history"><span class="note">Waiting for the first result…</span></div></section>
+  <section class="timings"><h2>Multiplier speed settings</h2><div class="timing-grid">
+    <div class="timing"><span>1.00× → 2.00×</span><b>5 sec</b></div><div class="timing"><span>2.00× → 5.00×</span><b>7 sec</b></div>
+    <div class="timing"><span>5.00× → 10.00×</span><b>6 sec</b></div><div class="timing"><span>10.00× → 50.00×</span><b>25 sec</b></div>
+    <div class="timing"><span>50.00× → 100.00×</span><b>30 sec</b></div>
+  </div><p class="note">All connected screens receive the same server-controlled round, multiplier and crash result. A 10-second registration/countdown period follows each crash.</p></section>
+  <footer>CrashZone · Shared round server</footer>
+</main>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const socket = io({ transports: ['websocket', 'polling'] });
+  let latest = null;
+  socket.on('connect', () => $('connection').textContent = 'Connected');
+  socket.on('disconnect', () => $('connection').textContent = 'Reconnecting…');
+  socket.on('game:state', s => { latest = s; render(s); });
+  function render(s) {
+    $('round').textContent = `ROUND ${String(s.roundId).padStart(4,'0')}`;
+    $('phase').textContent = s.phase === 'running' ? 'LIVE' : s.phase === 'crashed' ? 'CRASHED' : 'NEXT ROUND';
+    $('multiplier').textContent = `${Number(s.multiplier || 1).toFixed(2)}×`;
+    $('multiplier').classList.toggle('crashed', s.phase === 'crashed');
+    $('online').textContent = s.online;
+    $('lastCrash').textContent = s.history && s.history.length ? `${Number(s.history[0].crashPoint).toFixed(2)}×` : '—';
+    if (s.phase === 'running') {
+      $('message').textContent = 'Multiplier rising…';
+      const elapsed = Date.now() - s.roundStartedAt;
+      $('timer').textContent = `${Math.max(0,elapsed/1000).toFixed(1)}s`;
+      $('progress').style.width = `${Math.min(100, Number(s.multiplier)/100*100)}%`;
+    } else {
+      const remaining = Math.max(0, (s.nextRoundAt || Date.now()) - Date.now());
+      $('message').textContent = s.phase === 'crashed' ? `Crashed at ${Number(s.crashPoint).toFixed(2)}× · next round soon` : 'Preparing the next shared round…';
+      $('timer').textContent = `${(remaining/1000).toFixed(1)}s`;
+      $('progress').style.width = '0%';
+    }
+    const history = $('history'); history.replaceChildren();
+    if (!s.history || !s.history.length) { history.textContent = 'Waiting for the first result…'; return; }
+    s.history.forEach(item => {
+      const chip = document.createElement('span');
+      chip.className = `chip ${item.crashPoint >= 2 ? 'high' : 'low'}`;
+      chip.textContent = `${Number(item.crashPoint).toFixed(2)}×`;
+      chip.title = `Round ${item.roundId}`;
+      history.appendChild(chip);
+    });
+  }
+  setInterval(() => {
+    if (!latest) return;
+    if (latest.phase === 'running') {
+      const elapsed = Date.now() - latest.roundStartedAt;
+      $('timer').textContent = `${Math.max(0,elapsed/1000).toFixed(1)}s`;
+    } else if (latest.nextRoundAt) {
+      $('timer').textContent = `${(Math.max(0,latest.nextRoundAt-Date.now())/1000).toFixed(1)}s`;
+    }
+  }, 100);
+})();
+</script>
+</body>
+</html>
