@@ -18,7 +18,7 @@ app.get('/health', (_req, res) => res.json({
 }));
 app.get('/', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
-const WAIT_MS = 15000;
+const WAIT_MS = 12000;
 const TICK_MS = 100;
 const MAX_BET = 1000;
 const STARTING_CREDITS = 1000;
@@ -159,8 +159,12 @@ io.on('connection', socket => {
     if (previousBet && previousBet.status === 'active') return socket.emit('game:error', 'You already have an active bet.');
     if (previousBet) bets.delete(socket.id);
     const amount = Number(raw && raw.amount);
-    const autoCashoutRaw = Number(raw && raw.autoCashout);
-    const autoCashout = Number.isFinite(autoCashoutRaw) && autoCashoutRaw >= 1.01 && autoCashoutRaw <= 100 ? Math.round(autoCashoutRaw * 100) / 100 : null;
+    const autoValue = raw && raw.autoCashout;
+    const autoCashoutRaw = autoValue === null || autoValue === undefined || String(autoValue).trim() === '' ? null : Number(autoValue);
+    if (autoCashoutRaw !== null && (!Number.isFinite(autoCashoutRaw) || autoCashoutRaw < 1.01 || autoCashoutRaw > 100)) {
+      return socket.emit('game:error', 'Auto cash-out must be between 1.01× and 100×, or leave it blank.');
+    }
+    const autoCashout = autoCashoutRaw === null ? null : Math.round(autoCashoutRaw * 100) / 100;
     if (!Number.isInteger(amount) || amount < 1 || amount > MAX_BET) {
       return socket.emit('game:error', `Bet must be 1–${MAX_BET} virtual credits.`);
     }
@@ -211,10 +215,12 @@ setInterval(() => {
     }
     const liveMultiplier = multiplierAtElapsed(elapsed);
     state.multiplier = Number(liveMultiplier.toFixed(2));
-    // Compare against the unrounded server multiplier so low/decimal thresholds
-    // trigger reliably, and never allow an automatic cash-out at/after the crash.
+    // Trigger auto cash-out from the shared server timeline. A target only pays
+    // if its multiplier is reached strictly before the crash point.
     for (const [id, bet] of bets) {
-      if (bet.status === 'active' && bet.autoCashout && liveMultiplier >= bet.autoCashout && elapsed < targetCrashAtMs) {
+      if (bet.status !== 'active' || !Number.isFinite(bet.autoCashout)) continue;
+      const autoAtMs = elapsedForMultiplier(bet.autoCashout);
+      if (bet.autoCashout < state._target && elapsed >= autoAtMs && autoAtMs < targetCrashAtMs) {
         cashoutPlayer(id, bet.autoCashout, true);
       }
     }
