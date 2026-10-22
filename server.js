@@ -74,6 +74,8 @@ function authRequired(req, res, next) {
 // Separate owner-admin session. Credentials are configured only in server environment.
 const adminSessions = new Map();
 const runtimeSettings = { aviator:{enabled:true,duration_seconds:30,rules:''}, bigsmall:{enabled:true,duration_seconds:30,rules:''}, color:{enabled:true,duration_seconds:30,rules:''}, lucky:{enabled:true,duration_seconds:30,rules:''} };
+// Transparent, in-memory one-shot outcome overrides for virtual-credit QA/demo only.
+const pendingOutcomes = new Map();
 const suspendedUsers = new Set();
 function gameEnabled(game){ return runtimeSettings[game]?.enabled !== false; }
 function gameDurationMs(game){ return Math.max(5,Math.min(300,Number(runtimeSettings[game]?.duration_seconds)||30))*1000; }
@@ -257,6 +259,9 @@ app.get('/api/admin/reports', adminRequired, async (req,res) => {
 });
 app.get('/api/admin/settings',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_game_settings').select('*').order('game');if(error)return res.status(503).json({error:'Settings table unavailable. Apply admin SQL migration.'});for(const row of data||[])runtimeSettings[row.game]={enabled:row.enabled,duration_seconds:row.duration_seconds,rules:row.rules||''};res.json({settings:data||[]});});
 app.put('/api/admin/settings/:game',adminRequired,async(req,res)=>{const game=String(req.params.game);if(!['aviator','bigsmall','color','lucky'].includes(game))return res.status(400).json({error:'Unknown game.'});const enabled=req.body?.enabled===true;const duration=Number(req.body?.duration_seconds);const rules=String(req.body?.rules||'').slice(0,4000);if(!Number.isInteger(duration)||duration<5||duration>300)return res.status(400).json({error:'Duration must be 5–300 seconds.'});const {data,error}=await supabase.from('crashzone_admin_game_settings').upsert({game,enabled,duration_seconds:duration,rules,updated_by:req.admin.username,updated_at:new Date().toISOString()},{onConflict:'game'}).select().single();if(error)return res.status(503).json({error:'Could not save settings. Apply admin SQL migration.'});runtimeSettings[game]={enabled,duration_seconds:duration,rules};await auditAdmin(req,'update_game_settings','game',game,{enabled,duration_seconds:duration});res.json({setting:data});});
+app.get('/api/admin/future-results',adminRequired,(req,res)=>res.json({results:[...pendingOutcomes.entries()].map(([game,value])=>({game,value,queuedAt:value.queuedAt||null}))}));
+app.post('/api/admin/future-results',adminRequired,async(req,res)=>{const game=String(req.body?.game||'');let value=req.body?.value;if(!['aviator','bigsmall','color','lucky'].includes(game))return res.status(400).json({error:'Unknown game.'});if(game==='aviator'){value=Number(value);if(!Number.isFinite(value)||value<1||value>1000)return res.status(400).json({error:'Aviator multiplier must be 1.00–1000.00.'});value=Math.round(value*100)/100;}else if(game==='bigsmall'||game==='lucky'){value=Number(value);if(!Number.isInteger(value)||value<0||value>9)return res.status(400).json({error:'Choose a digit from 0 to 9.'});}else{value=String(value);if(!['blue','green','yellow','red','pink','violet','black','orange'].includes(value))return res.status(400).json({error:'Choose a valid Color Prediction result.'});}const queued={value,queuedAt:new Date().toISOString(),queuedBy:req.admin.username};pendingOutcomes.set(game,queued);await auditAdmin(req,'queue_demo_outcome','game',game,{value});res.json({ok:true,game,value,queuedAt:queued.queuedAt,note:'One-shot override for virtual-credit QA/demo; consumed by the next round start.'});});
+app.delete('/api/admin/future-results/:game',adminRequired,async(req,res)=>{const game=String(req.params.game);if(!pendingOutcomes.has(game))return res.status(404).json({error:'No queued result for this game.'});pendingOutcomes.delete(game);await auditAdmin(req,'cancel_demo_outcome','game',game);res.json({ok:true});});
 app.get('/api/admin/expenses',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_expenses').select('*').order('expense_date',{ascending:false}).limit(500);if(error)return res.status(503).json({error:'Expenses table unavailable. Apply admin SQL migration.'});res.json({expenses:data||[]});});
 app.post('/api/admin/expenses',adminRequired,async(req,res)=>{const description=String(req.body?.description||'').trim().slice(0,200),category=String(req.body?.category||'other').slice(0,60),amount=Number(req.body?.amount),expense_date=String(req.body?.expense_date||new Date().toISOString().slice(0,10));if(!description||!Number.isSafeInteger(amount)||amount<0||amount>1000000000)return res.status(400).json({error:'Enter a description and a non-negative whole amount.'});const {data,error}=await supabase.from('crashzone_admin_expenses').insert({description,category,amount,expense_date,created_by:req.admin.username}).select().single();if(error)return res.status(503).json({error:'Could not save expense. Apply admin SQL migration.'});await auditAdmin(req,'create_expense','expense',data.id,{amount,category});res.status(201).json({expense:data});});
 app.get('/api/admin/support',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_support_tickets').select('*').order('created_at',{ascending:false}).limit(500);if(error)return res.status(503).json({error:'Support table unavailable. Apply admin SQL migration.'});res.json({tickets:data||[]});});
@@ -306,7 +311,8 @@ function startMiniRound(type) {
   const now = Date.now(); const old = miniGames.get(type);
   if (!gameEnabled(type)) { const g={type,roundId:old?old.roundId+1:1,openedAt:now,closesAt:now,revealAt:now+gameDurationMs(type),result:randomMiniResult(type),resultVisible:false,history:old?old.history:[],wagers:new Map()}; miniGames.set(type,g); broadcastMini(type); return; }
   const history = old ? old.history : [];
-  const g = { type, roundId: old ? old.roundId + 1 : 1, openedAt: now, closesAt: now + gameDurationMs(type), revealAt: now + gameDurationMs(type), result: randomMiniResult(type), resultVisible: false, history, wagers: new Map() };
+  const queued = pendingOutcomes.get(type); if (queued) pendingOutcomes.delete(type);
+  const g = { type, roundId: old ? old.roundId + 1 : 1, openedAt: now, closesAt: now + gameDurationMs(type), revealAt: now + gameDurationMs(type), result: queued ? queued.value : randomMiniResult(type), resultVisible: false, history, wagers: new Map() };
   miniGames.set(type, g); broadcastMini(type);
 }
 for (const type of Object.keys(MINI_CONFIG)) startMiniRound(type);
@@ -412,7 +418,8 @@ function startRound() {
   state.nextRoundAt = null;
   // Keep bets placed during the countdown; they belong to the round that just started.
   for (const bet of bets.values()) bet.roundId = state.roundId;
-  const point = randomCrashPoint();
+  const queued = pendingOutcomes.get('aviator'); if (queued) pendingOutcomes.delete('aviator');
+  const point = queued ? Number(queued.value) : randomCrashPoint();
   targetCrashAtMs = elapsedForMultiplier(point);
   state._target = point;
   broadcast();
