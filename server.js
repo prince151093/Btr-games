@@ -67,11 +67,16 @@ function setSession(res, user) {
 function authRequired(req, res, next) {
   const user = sessionUser(req);
   if (!user) return res.status(401).json({ error: 'Please log in to continue.' });
+  if (suspendedUsers.has(user.id)) return res.status(403).json({ error: 'This account is suspended. Contact support.' });
   req.account = user; next();
 }
 
 // Separate owner-admin session. Credentials are configured only in server environment.
 const adminSessions = new Map();
+const runtimeSettings = { aviator:{enabled:true,duration_seconds:30,rules:''}, bigsmall:{enabled:true,duration_seconds:30,rules:''}, color:{enabled:true,duration_seconds:30,rules:''}, lucky:{enabled:true,duration_seconds:30,rules:''} };
+const suspendedUsers = new Set();
+function gameEnabled(game){ return runtimeSettings[game]?.enabled !== false; }
+function gameDurationMs(game){ return Math.max(5,Math.min(300,Number(runtimeSettings[game]?.duration_seconds)||30))*1000; }
 function safeStringEqual(a, b) {
   const aa = Buffer.from(String(a || ''));
   const bb = Buffer.from(String(b || ''));
@@ -134,6 +139,7 @@ app.post('/api/auth/login', async (req, res) => {
   let user = database.users.find(u => u.phone === phone);
   if (!user) { const { data } = await supabase.from('crashzone_users').select('*').eq('phone', phone).maybeSingle(); if (data) { user = mapUser(data); database.users.push(user); } }
   if (!user || !passwordMatches(password, user)) return res.status(401).json({ error: 'Incorrect phone number or password.' });
+  if (suspendedUsers.has(user.id)) return res.status(403).json({ error: 'This account is suspended. Contact support.' });
   setSession(res, user); res.json({ user: publicAccount(user) });
 });
 app.post('/api/auth/logout', (req, res) => {
@@ -196,7 +202,7 @@ app.get('/api/admin/overview', adminRequired, async (req, res) => {
 app.get('/api/admin/users', adminRequired, (req, res) => {
   const q = String(req.query.q || '').toLowerCase().slice(0,100);
   const users = database.users.filter(u => !q || [u.username,u.phone,u.uid,String(u.userNumber)].some(v=>String(v||'').toLowerCase().includes(q)))
-    .slice(0,500).map(u => ({ id:u.id, username:u.username, phone:u.phone, uid:u.uid, userNumber:u.userNumber, balance:u.balance, createdAt:u.createdAt }));
+    .slice(0,500).map(u => ({ id:u.id, username:u.username, phone:u.phone, uid:u.uid, userNumber:u.userNumber, balance:u.balance, createdAt:u.createdAt, suspended:suspendedUsers.has(u.id) }));
   res.json({ users });
 });
 app.post('/api/admin/users/:id/adjust-balance', adminRequired, async (req, res) => {
@@ -213,6 +219,60 @@ app.post('/api/admin/users/:id/adjust-balance', adminRequired, async (req, res) 
   broadcast();
   res.json({ok:true,balance:user.balance});
 });
+
+// Extended admin APIs: settings, expenses, support, staff, history, audit and reports.
+async function adminTable(table, queryFn) {
+  let q = supabase.from(table).select('*');
+  return await queryFn(q);
+}
+async function auditAdmin(req, action, entityType, entityId, details={}) {
+  const { error } = await supabase.from('crashzone_admin_audit_logs').insert({
+    actor_username: req.admin?.username || 'unknown', action, entity_type: entityType,
+    entity_id: entityId == null ? null : String(entityId), details
+  });
+  if (error) console.error('Admin audit write failed:', error.message);
+}
+app.get('/api/admin/reports', adminRequired, async (req,res) => {
+  const game = String(req.query.game || 'all');
+  const from = String(req.query.from || '').slice(0,10);
+  const to = String(req.query.to || '').slice(0,10);
+  const user = String(req.query.user || '').slice(0,100);
+  const round = String(req.query.round || '').slice(0,100);
+  let q = supabase.from('crashzone_admin_ledger').select('*').order('created_at',{ascending:false}).limit(10000);
+  if (game !== 'all' && ['aviator','bigsmall','color','lucky','admin'].includes(game)) q=q.eq('game',game);
+  if (from) q=q.gte('created_at',from+'T00:00:00.000Z');
+  if (to) q=q.lte('created_at',to+'T23:59:59.999Z');
+  if (user) { if (/^[0-9a-f-]{36}$/i.test(user)) q=q.eq('user_id',user); else q=q.ilike('username',`%${user.replace(/[%,()]/g,'')}%`); }
+  if (round) q=q.ilike('round_id',`%${round.replace(/[%,]/g,'')}%`);
+  const {data,error}=await q;
+  if(error)return res.status(503).json({error:'Could not load ledger. Apply the admin SQL migration.'});
+  const rows=data||[]; const byGame={};
+  for(const k of ['aviator','bigsmall','color','lucky'])byGame[k]={stakes:0,payouts:0,refunds:0,bonuses:0,adjustments:0,net:0,entries:0};
+  for(const r of rows){const g=byGame[r.game];if(!g)continue;g.entries++;const n=Number(r.amount)||0;if(r.entry_type==='stake')g.stakes+=n;if(r.entry_type==='payout')g.payouts+=n;if(r.entry_type==='refund')g.refunds+=n;if(r.entry_type==='bonus')g.bonuses+=n;if(r.entry_type==='adjustment')g.adjustments+=n;}
+  for(const g of Object.values(byGame))g.net=g.stakes-g.payouts-g.refunds;
+  const ex=await supabase.from('crashzone_admin_expenses').select('*').order('expense_date',{ascending:false}).limit(2000);
+  if(ex.error && ex.error.code!=='42P01') return res.status(503).json({error:'Could not load expenses. Apply the admin SQL migration.'});
+  const expenses=(ex.data||[]).filter(e=>(!from||e.expense_date>=from)&&(!to||e.expense_date<=to));
+  res.json({rows:rows.slice(0,1000),byGame,expenses,totalExpenses:expenses.reduce((n,e)=>n+Number(e.amount||0),0),net:Object.values(byGame).reduce((n,g)=>n+g.net,0),operatingNet:Object.values(byGame).reduce((n,g)=>n+g.net,0)-expenses.reduce((n,e)=>n+Number(e.amount||0),0)});
+});
+app.get('/api/admin/settings',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_game_settings').select('*').order('game');if(error)return res.status(503).json({error:'Settings table unavailable. Apply admin SQL migration.'});for(const row of data||[])runtimeSettings[row.game]={enabled:row.enabled,duration_seconds:row.duration_seconds,rules:row.rules||''};res.json({settings:data||[]});});
+app.put('/api/admin/settings/:game',adminRequired,async(req,res)=>{const game=String(req.params.game);if(!['aviator','bigsmall','color','lucky'].includes(game))return res.status(400).json({error:'Unknown game.'});const enabled=req.body?.enabled===true;const duration=Number(req.body?.duration_seconds);const rules=String(req.body?.rules||'').slice(0,4000);if(!Number.isInteger(duration)||duration<5||duration>300)return res.status(400).json({error:'Duration must be 5–300 seconds.'});const {data,error}=await supabase.from('crashzone_admin_game_settings').upsert({game,enabled,duration_seconds:duration,rules,updated_by:req.admin.username,updated_at:new Date().toISOString()},{onConflict:'game'}).select().single();if(error)return res.status(503).json({error:'Could not save settings. Apply admin SQL migration.'});runtimeSettings[game]={enabled,duration_seconds:duration,rules};await auditAdmin(req,'update_game_settings','game',game,{enabled,duration_seconds:duration});res.json({setting:data});});
+app.get('/api/admin/expenses',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_expenses').select('*').order('expense_date',{ascending:false}).limit(500);if(error)return res.status(503).json({error:'Expenses table unavailable. Apply admin SQL migration.'});res.json({expenses:data||[]});});
+app.post('/api/admin/expenses',adminRequired,async(req,res)=>{const description=String(req.body?.description||'').trim().slice(0,200),category=String(req.body?.category||'other').slice(0,60),amount=Number(req.body?.amount),expense_date=String(req.body?.expense_date||new Date().toISOString().slice(0,10));if(!description||!Number.isSafeInteger(amount)||amount<0||amount>1000000000)return res.status(400).json({error:'Enter a description and a non-negative whole amount.'});const {data,error}=await supabase.from('crashzone_admin_expenses').insert({description,category,amount,expense_date,created_by:req.admin.username}).select().single();if(error)return res.status(503).json({error:'Could not save expense. Apply admin SQL migration.'});await auditAdmin(req,'create_expense','expense',data.id,{amount,category});res.status(201).json({expense:data});});
+app.get('/api/admin/support',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_support_tickets').select('*').order('created_at',{ascending:false}).limit(500);if(error)return res.status(503).json({error:'Support table unavailable. Apply admin SQL migration.'});res.json({tickets:data||[]});});
+app.post('/api/admin/support',adminRequired,async(req,res)=>{const subject=String(req.body?.subject||'').trim().slice(0,200),message=String(req.body?.message||'').trim().slice(0,5000),status=String(req.body?.status||'open');if(!subject||!message||!['open','in_progress','closed'].includes(status))return res.status(400).json({error:'Subject, message and valid status are required.'});const {data,error}=await supabase.from('crashzone_admin_support_tickets').insert({subject,message,status,assigned_to:req.admin.username,created_by:req.admin.username}).select().single();if(error)return res.status(503).json({error:'Could not create ticket. Apply admin SQL migration.'});await auditAdmin(req,'create_support_ticket','ticket',data.id,{subject});res.status(201).json({ticket:data});});
+app.patch('/api/admin/support/:id',adminRequired,async(req,res)=>{const status=String(req.body?.status||'');if(!['open','in_progress','closed'].includes(status))return res.status(400).json({error:'Invalid ticket status.'});const {data,error}=await supabase.from('crashzone_admin_support_tickets').update({status,updated_at:new Date().toISOString(),assigned_to:String(req.body?.assigned_to||req.admin.username).slice(0,100)}).eq('id',req.params.id).select().single();if(error)return res.status(503).json({error:'Could not update ticket.'});await auditAdmin(req,'update_support_ticket','ticket',req.params.id,{status});res.json({ticket:data});});
+app.get('/api/admin/staff',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_memberships').select('*').order('created_at',{ascending:false});if(error)return res.status(503).json({error:'Staff table unavailable. Apply admin SQL migration.'});res.json({staff:data||[]});});
+app.post('/api/admin/staff',adminRequired,async(req,res)=>{const username=String(req.body?.username||'').trim(),role=String(req.body?.role||'support');const allowed=['manager','support'];const permissions=Array.isArray(req.body?.permissions)?req.body.permissions.filter(x=>['dashboard','users_read','users_suspend','game_settings','wallet_adjust','pnl_read','audit_read','support_manage'].includes(x)):[];if(!/^[A-Za-z0-9_.-]{3,50}$/.test(username)||!allowed.includes(role))return res.status(400).json({error:'Enter a valid staff username and role.'});const {data,error}=await supabase.from('crashzone_admin_memberships').upsert({username,role,permissions,active:true,created_by:req.admin.username},{onConflict:'username'}).select().single();if(error)return res.status(503).json({error:'Could not save staff member. Apply admin SQL migration.'});await auditAdmin(req,'upsert_staff','staff',username,{role,permissions});res.json({staff:data});});
+app.delete('/api/admin/staff/:username',adminRequired,async(req,res)=>{const username=String(req.params.username);if(username===req.admin.username)return res.status(400).json({error:'You cannot deactivate the current owner account.'});const {error}=await supabase.from('crashzone_admin_memberships').update({active:false}).eq('username',username);if(error)return res.status(503).json({error:'Could not deactivate staff member.'});await auditAdmin(req,'deactivate_staff','staff',username);res.json({ok:true});});
+app.get('/api/admin/audit',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_audit_logs').select('*').order('created_at',{ascending:false}).limit(500);if(error)return res.status(503).json({error:'Audit table unavailable. Apply admin SQL migration.'});res.json({logs:data||[]});});
+app.post('/api/admin/announcements',adminRequired,async(req,res)=>{const title=String(req.body?.title||'').trim().slice(0,150),message=String(req.body?.message||'').trim().slice(0,3000),active=req.body?.active!==false;if(!title||!message)return res.status(400).json({error:'Title and message are required.'});const {data,error}=await supabase.from('crashzone_admin_announcements').insert({title,message,active,created_by:req.admin.username}).select().single();if(error)return res.status(503).json({error:'Announcements table unavailable. Apply admin SQL migration.'});await auditAdmin(req,'create_announcement','announcement',data.id,{title,active});res.status(201).json({announcement:data});});
+app.get('/api/admin/announcements',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_announcements').select('*').order('created_at',{ascending:false}).limit(200);if(error)return res.status(503).json({error:'Announcements table unavailable. Apply admin SQL migration.'});res.json({announcements:data||[]});});
+
+
+app.get('/api/admin/users/:id/history',adminRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_ledger').select('*').eq('user_id',req.params.id).order('created_at',{ascending:false}).limit(500);if(error)return res.status(503).json({error:'Ledger history unavailable.'});res.json({history:data||[]});});
+app.post('/api/admin/users/:id/suspension',adminRequired,async(req,res)=>{const user=database.users.find(u=>u.id===req.params.id);if(!user)return res.status(404).json({error:'User not found.'});const suspended=req.body?.suspended===true;const {error}=await supabase.from('crashzone_admin_user_controls').upsert({user_id:user.id,suspended,reason:String(req.body?.reason||'').slice(0,300),updated_by:req.admin.username,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(error)return res.status(503).json({error:'User controls table unavailable. Apply admin SQL migration.'});if(suspended)suspendedUsers.add(user.id);else suspendedUsers.delete(user.id);await auditAdmin(req,suspended?'suspend_user':'unsuspend_user','user',user.id,{reason:String(req.body?.reason||'').slice(0,300)});res.json({ok:true,suspended});});
+
 app.get('/admin', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
 
 app.get('/health', (_req, res) => res.json({
@@ -220,7 +280,8 @@ app.get('/health', (_req, res) => res.json({
 }));
 app.get('/', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
-const WAIT_MS = 30000; // 30-second countdown between Aviator rounds
+const WAIT_MS = 30000; // fallback; admin-configured duration is used by waitMs()
+function waitMs(){ return gameDurationMs('aviator'); }
 const TICK_MS = 100;
 const MAX_BET = 1000;
 const STARTING_CREDITS = 1000;
@@ -243,8 +304,9 @@ function miniSnapshot(type) {
 function broadcastMini(type) { io.emit('mini:state', miniSnapshot(type)); }
 function startMiniRound(type) {
   const now = Date.now(); const old = miniGames.get(type);
+  if (!gameEnabled(type)) { const g={type,roundId:old?old.roundId+1:1,openedAt:now,closesAt:now,revealAt:now+gameDurationMs(type),result:randomMiniResult(type),resultVisible:false,history:old?old.history:[],wagers:new Map()}; miniGames.set(type,g); broadcastMini(type); return; }
   const history = old ? old.history : [];
-  const g = { type, roundId: old ? old.roundId + 1 : 1, openedAt: now, closesAt: now + MINI_BET_WINDOW_MS, revealAt: now + MINI_ROUND_MS, result: randomMiniResult(type), resultVisible: false, history, wagers: new Map() };
+  const g = { type, roundId: old ? old.roundId + 1 : 1, openedAt: now, closesAt: now + gameDurationMs(type), revealAt: now + gameDurationMs(type), result: randomMiniResult(type), resultVisible: false, history, wagers: new Map() };
   miniGames.set(type, g); broadcastMini(type);
 }
 for (const type of Object.keys(MINI_CONFIG)) startMiniRound(type);
@@ -280,7 +342,7 @@ setInterval(() => {
 
 let state = {
   phase: 'waiting', roundId: 0, multiplier: 1, crashPoint: null,
-  roundStartedAt: null, nextRoundAt: Date.now() + WAIT_MS,
+  roundStartedAt: null, nextRoundAt: Date.now() + waitMs(),
   history: [], online: 0
 };
 let targetCrashAtMs = null;
@@ -382,7 +444,7 @@ function finishRound(point) {
   state.crashPoint = state.multiplier;
   state.history.unshift({ roundId: state.roundId, crashPoint: state.crashPoint });
   state.history = state.history.slice(0, 100);
-  state.nextRoundAt = Date.now() + WAIT_MS;
+  state.nextRoundAt = Date.now() + waitMs();
   targetCrashAtMs = null;
   for (const [id, bet] of bets) {
     if (!bet.cashedOut) {
@@ -397,7 +459,7 @@ io.use((socket, next) => {
   const token = parseCookies(socket.handshake.headers.cookie).cz_session;
   const userId = token && sessions.get(token);
   const user = userId && database.users.find(u => u.id === userId);
-  if (!user) return next(new Error('AUTH_REQUIRED'));
+  if (!user || suspendedUsers.has(user.id)) return next(new Error('AUTH_REQUIRED'));
   socket.data.accountId = user.id; next();
 });
 io.on('connection', socket => {
@@ -421,7 +483,8 @@ io.on('connection', socket => {
 
   socket.on('mini:join', type => { if (MINI_CONFIG[type]) socket.emit('mini:state', miniSnapshot(type)); });
   socket.on('mini:bet', raw => {
-    const current = players.get(socket.id); if (!current) return;
+    const current = players.get(socket.id);
+    if (!gameEnabled(String(raw?.type||''))) return socket.emit('game:error', 'This game is currently disabled by the administrator.'); if (!current) return;
     const type = String(raw && raw.type || ''); const g = miniGames.get(type);
     if (!g || !MINI_CONFIG[type]) return socket.emit('game:error', 'Unknown game.');
     if (Date.now() >= g.closesAt || g.resultVisible) return socket.emit('game:error', 'Betting is closed for this round.');
@@ -446,6 +509,7 @@ io.on('connection', socket => {
 
   socket.on('bet:place', raw => {
     const current = players.get(socket.id);
+    if (!gameEnabled('aviator')) return socket.emit('game:error', 'Aviator is currently disabled by the administrator.');
     if (!current) return;
     if (state.phase !== 'waiting' && state.phase !== 'crashed') return socket.emit('game:error', 'Bets are closed for this round.');
     const previousBet = bets.get(socket.id);
@@ -529,7 +593,11 @@ setInterval(() => {
   }
 }, TICK_MS);
 
-loadDatabase().then(() => {
+loadDatabase().then(async () => {
+  const settingsResult=await supabase.from('crashzone_admin_game_settings').select('*');
+  if(!settingsResult.error) for(const row of settingsResult.data||[]) runtimeSettings[row.game]={enabled:row.enabled,duration_seconds:row.duration_seconds,rules:row.rules||''};
+  const controlsResult=await supabase.from('crashzone_admin_user_controls').select('user_id,suspended');
+  if(!controlsResult.error) for(const row of controlsResult.data||[]) if(row.suspended)suspendedUsers.add(row.user_id);
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`CrashZone Aviator listening on port ${PORT}`);
     console.log(`Loaded ${database.users.length} CrashZone accounts from Supabase`);
