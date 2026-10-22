@@ -106,8 +106,16 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
   $('roundText').textContent='Round #'+(game.roundId||0);
   const timer=$('takeoffTimer');
   const countdown=$('countdownValue');
-  if(game.phase==='running'){timer.classList.add('flying');timer.innerHTML='PLANE IN FLIGHT · <strong>LIVE</strong>';countdown.textContent='LIVE';$('timerText').textContent='Cash out before the crash';}
-  else {timer.classList.remove('flying');const ms=Math.max(0,(Number(game.nextRoundAt)||Date.now())-(Date.now()+serverOffset));const seconds=Math.max(1,Math.ceil(ms/1000));timer.innerHTML='TAKEOFF IN <strong id="countdownValue">'+seconds+'</strong>'; $('timerText').textContent=game.phase==='crashed'?'Crashed at '+Number(game.crashPoint||1).toFixed(2)+'×':'Place your bet before takeoff';}
+  if(game.phase==='running'){
+   timer.classList.add('flying');
+   if(timer.dataset.mode!=='running'){timer.innerHTML='PLANE IN FLIGHT · <strong id="countdownValue">LIVE</strong>';timer.dataset.mode='running';}
+   $('timerText').textContent='Cash out before the crash';
+  } else {
+   timer.classList.remove('flying');
+   if(timer.dataset.mode!=='countdown'){timer.innerHTML='TAKEOFF IN <strong id="countdownValue">15</strong>';timer.dataset.mode='countdown';}
+   renderCountdownOnly();
+   $('timerText').textContent=game.phase==='crashed'?'Crashed at '+Number(game.crashPoint||1).toFixed(2)+'×':'Place your bet before takeoff';
+  }
   $('history').replaceChildren();
   if(!game.history||!game.history.length){const s=document.createElement('span');s.className='muted';s.textContent='Waiting for first round…';$('history').append(s)}
   else game.history.forEach(item=>{const c=document.createElement('span');c.className='chip '+(item.crashPoint<2?'low':item.crashPoint<10?'mid':'high');c.textContent=Number(item.crashPoint).toFixed(2)+'×';$('history').append(c)});
@@ -148,7 +156,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
  socket.on('game:error',msg=>toast(msg));
  render();
  setInterval(()=>{if(game.phase!=='running')renderCountdownOnly()},100);
- function renderCountdownOnly(){const el=$('countdownValue');if(!el||game.phase==='running')return;const ms=Math.max(0,(Number(game.nextRoundAt)||Date.now())-(Date.now()-serverOffset));el.textContent=String(Math.max(1,Math.ceil(ms/1000)));}
+ function renderCountdownOnly(){const el=$('countdownValue');if(!el||game.phase==='running')return;const deadline=Number(game.nextRoundAt);const serverNow=Date.now()-serverOffset;const ms=Math.max(0,(Number.isFinite(deadline)?deadline:serverNow)-serverNow);const seconds=Math.max(0,Math.ceil(ms/1000));const next=String(seconds);if(el.textContent!==next)el.textContent=next;}
 })();
 </script>
 </body>
