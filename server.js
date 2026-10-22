@@ -135,6 +135,47 @@ const MAX_BET = 1000;
 const STARTING_CREDITS = 1000;
 const players = new Map();
 const bets = new Map();
+const miniGames = new Map();
+const MINI_BET_WINDOW_MS = 10000;
+const MINI_ROUND_MS = 12000;
+const MINI_MAX_BET = 1000;
+const MINI_CONFIG = { bigsmall: { payout: 1.9 }, color: { payout: 7 }, lucky: { payout: 8 } };
+function randomMiniResult(type) {
+  if (type === 'bigsmall') return crypto.randomInt(0, 10);
+  if (type === 'color') return ['blue','green','yellow','red','pink','violet','black','orange'][crypto.randomInt(0, 8)];
+  return crypto.randomInt(0, 10);
+}
+function miniSnapshot(type) {
+  const g = miniGames.get(type);
+  return { type, roundId: g.roundId, phase: Date.now() < g.closesAt ? 'open' : 'revealing', closesAt: g.closesAt, revealAt: g.revealAt, serverTime: Date.now(), result: g.resultVisible ? g.result : null, history: g.history.slice(0, 8) };
+}
+function broadcastMini(type) { io.emit('mini:state', miniSnapshot(type)); }
+function startMiniRound(type) {
+  const now = Date.now(); const old = miniGames.get(type);
+  const history = old ? old.history : [];
+  const g = { type, roundId: old ? old.roundId + 1 : 1, openedAt: now, closesAt: now + MINI_BET_WINDOW_MS, revealAt: now + MINI_ROUND_MS, result: randomMiniResult(type), resultVisible: false, history, wagers: new Map() };
+  miniGames.set(type, g); broadcastMini(type);
+}
+for (const type of Object.keys(MINI_CONFIG)) startMiniRound(type);
+setInterval(() => {
+  const now = Date.now();
+  for (const type of Object.keys(MINI_CONFIG)) {
+    let g = miniGames.get(type);
+    if (now >= g.revealAt && !g.resultVisible) {
+      g.resultVisible = true; g.history.unshift({ roundId: g.roundId, result: g.result }); g.history = g.history.slice(0, 8);
+      for (const [socketId, wager] of g.wagers) {
+        const player = players.get(socketId); if (!player || wager.settled) continue;
+        const won = type === 'bigsmall' ? (wager.pick === 'big' ? g.result >= 5 : g.result <= 4) : wager.pick === String(g.result);
+        let payout = 0; if (won) payout = Math.floor(wager.amount * MINI_CONFIG[type].payout);
+        player.balance += payout; persistBalance(player); wager.settled = true; wager.status = won ? 'won' : 'lost'; wager.payout = payout;
+        io.to(socketId).emit('mini:result', { type, roundId: g.roundId, pick: wager.pick, result: g.result, amount: wager.amount, won, payout, balance: player.balance, multiplier: MINI_CONFIG[type].payout });
+        const sock = io.sockets.sockets.get(socketId); if (sock) sendPlayer(sock);
+      }
+      broadcastMini(type);
+      setTimeout(() => startMiniRound(type), 1800);
+    } else if (now < g.revealAt) broadcastMini(type);
+  }
+}, 500);
 
 let state = {
   phase: 'waiting', roundId: 0, multiplier: 1, crashPoint: null,
@@ -274,6 +315,24 @@ io.on('connection', socket => {
     if (name) current.name = name;
     sendPlayer(socket);
     broadcast();
+  });
+
+  socket.on('mini:join', type => { if (MINI_CONFIG[type]) socket.emit('mini:state', miniSnapshot(type)); });
+  socket.on('mini:bet', raw => {
+    const current = players.get(socket.id); if (!current) return;
+    const type = String(raw && raw.type || ''); const g = miniGames.get(type);
+    if (!g || !MINI_CONFIG[type]) return socket.emit('game:error', 'Unknown game.');
+    if (Date.now() >= g.closesAt || g.resultVisible) return socket.emit('game:error', 'Betting is closed for this round.');
+    if (g.wagers.has(socket.id)) return socket.emit('game:error', 'You have already entered this round.');
+    const amount = Number(raw.amount); const pick = String(raw.pick);
+    const validPick = type === 'bigsmall' ? ['big','small'].includes(pick) : type === 'color' ? ['blue','green','yellow','red','pink','violet','black','orange'].includes(pick) : /^[0-9]$/.test(pick);
+    if (!validPick) return socket.emit('game:error', 'Choose a valid option.');
+    if (!Number.isInteger(amount) || amount < 1 || amount > MINI_MAX_BET) return socket.emit('game:error', `Bet must be 1–${MINI_MAX_BET} virtual credits.`);
+    if (amount > current.balance) return socket.emit('game:error', 'Not enough virtual credits.');
+    current.balance -= amount; persistBalance(current);
+    g.wagers.set(socket.id, { amount, pick, settled: false });
+    socket.emit('mini:bet:accepted', { type, roundId: g.roundId, amount, pick, balance: current.balance });
+    sendPlayer(socket); broadcast();
   });
 
   socket.on('bet:place', raw => {
