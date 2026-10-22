@@ -1,21 +1,43 @@
-# CrashZone Aviator (Virtual Credits)
+# CrashZone Aviator
 
-A multiplayer Aviator-style crash-game demo built with Express and Socket.IO. It uses virtual credits only and has no deposits, withdrawals, or real-money value.
+CrashZone is a Node.js/Express + Socket.IO demo game with phone/password accounts and Supabase PostgreSQL storage. It uses virtual credits only.
 
-## Render setup
-- Build command: `npm install`
-- Start command: `npm start`
-- Node: 18 or newer
+## Supabase setup
 
-Project layout:
+1. Create a project at https://supabase.com.
+2. In Supabase, open **SQL Editor**, create a query, paste all of `supabase-schema.sql`, and run it.
+3. In Supabase **Project Settings → API** (or **Connect**), copy the Project URL and the server-side `service_role` key/secret.
+4. Add these environment variables to your host (for example Render → your service → Environment):
+   - `SUPABASE_URL` = your project URL
+   - `SUPABASE_SERVICE_ROLE_KEY` = the service-role secret/key
+   - `NODE_ENV` = `production`
+5. Redeploy. The server loads accounts from `public.crashzone_users` at startup.
+
+**Security:** Never put `SUPABASE_SERVICE_ROLE_KEY` in `src/public`, frontend JavaScript, a mobile app, or a public repository. Keep it only in the server's environment variables. Row Level Security is enabled and no browser access policies are created; requests must go through this server.
+
+## Run locally
+
+Requires Node.js 18 or newer.
+
+```sh
+npm install
+cp .env.example .env
+# Edit .env with your real Supabase values; do not commit .env
+npm start
 ```
-server.js
-package.json
-src/public/index.html
-```
 
-## Important limitations
-- Player balances are in-memory and reset when the server restarts.
-- This is a prototype, not a certified gambling system or audited random-number generator.
-- There is no real-money payment, deposit, or withdrawal code.
-- Do not use this prototype to accept real-money wagers.
+The server expects `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` at startup and will not start without them.
+
+## Account behavior
+
+- Sign up and log in with phone number + password; no OTP flow.
+- Passwords are salted and hashed with Node.js `scrypt`; they are not stored as plain text.
+- User numbers are assigned by a PostgreSQL sequence. Default username is `user<number>` and immutable UID is `1000000000 + number` (for example user 5 receives UID `1000000005`).
+- Users may change their username from the profile endpoint; the UID and account number are not editable.
+- Balances are persisted to Supabase by the game server.
+
+## Notes
+
+- A PostgreSQL sequence guarantees unique account numbers under concurrent sign-ups, but sequence numbers can have gaps if an account insert fails; never assume there are no gaps.
+- Existing accounts in a previous local `users.json` file are **not automatically migrated**. Import them deliberately if needed; do not upload password hashes or account data to a public location.
+- This is a demo virtual-credit game, not a production-grade real-money gambling platform. Before public launch, add rate limiting, monitoring, robust balance transactions, and a review of game fairness and account recovery.

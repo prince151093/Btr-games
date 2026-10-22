@@ -4,6 +4,7 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const crypto = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
 const { Server } = require('socket.io');
 
 const app = express();
@@ -12,7 +13,113 @@ const io = new Server(server);
 const PORT = Number(process.env.PORT) || 10000;
 const PUBLIC_DIR = path.join(__dirname, 'src', 'public');
 
+app.use(express.json({ limit: '20kb' }));
 app.use(express.static(PUBLIC_DIR));
+
+// Supabase-backed account store. Keep the service-role key server-side only.
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variable.');
+  process.exit(1);
+}
+const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } });
+let database = { users: [] };
+function mapUser(row) {
+  return { id: row.id, userNumber: row.user_number, uid: row.uid, phone: row.phone, username: row.username,
+    balance: Number(row.balance), passwordSalt: row.password_salt, passwordHash: row.password_hash, createdAt: row.created_at };
+}
+function dbUser(user) {
+  return { id: user.id, user_number: user.userNumber, uid: user.uid, phone: user.phone, username: user.username,
+    balance: user.balance, password_salt: user.passwordSalt, password_hash: user.passwordHash, created_at: user.createdAt };
+}
+async function loadDatabase() {
+  const { data, error } = await supabase.from('crashzone_users').select('*');
+  if (error) throw new Error('Could not load CrashZone users from Supabase: ' + error.message);
+  database.users = (data || []).map(mapUser);
+}
+async function saveUser(user) {
+  const { error } = await supabase.from('crashzone_users').upsert(dbUser(user), { onConflict: 'id' });
+  if (error) console.error('Supabase account save failed:', error.message);
+}
+const sessions = new Map();
+function parseCookies(header = '') {
+  const out = {};
+  for (const part of header.split(';')) {
+    const i = part.indexOf('='); if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return out;
+}
+function sessionUser(req) {
+  const token = parseCookies(req.headers.cookie).cz_session;
+  const userId = token && sessions.get(token);
+  return userId ? database.users.find(u => u.id === userId) || null : null;
+}
+function publicAccount(user) {
+  return { phone: user.phone, username: user.username, uid: user.uid, userNumber: user.userNumber, balance: user.balance };
+}
+function setSession(res, user) {
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions.set(token, user.id);
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `cz_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000${secure}`);
+}
+function authRequired(req, res, next) {
+  const user = sessionUser(req);
+  if (!user) return res.status(401).json({ error: 'Please log in to continue.' });
+  req.account = user; next();
+}
+function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
+  return { salt, hash: crypto.scryptSync(password, salt, 64).toString('hex') };
+}
+function passwordMatches(password, user) {
+  const actual = crypto.scryptSync(password, user.passwordSalt, 64);
+  const expected = Buffer.from(user.passwordHash, 'hex');
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
+app.get('/api/auth/me', (req, res) => {
+  const user = sessionUser(req);
+  res.json({ user: user ? publicAccount(user) : null });
+});
+app.post('/api/auth/signup', async (req, res) => {
+  const phone = String(req.body?.phone || '').replace(/[\s()-]/g, '');
+  const password = String(req.body?.password || '');
+  if (!/^\+?[0-9]{10,15}$/.test(phone)) return res.status(400).json({ error: 'Enter a valid phone number (10–15 digits).' });
+  if (password.length < 8 || password.length > 128) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  if (database.users.some(u => u.phone === phone)) return res.status(409).json({ error: 'An account with this phone number already exists. Please log in.' });
+  const { data: userNumber, error: numberError } = await supabase.rpc('crashzone_next_user_number');
+  if (numberError) return res.status(500).json({ error: 'Could not allocate an account number. Check the Supabase SQL setup.' });
+  const credentials = hashPassword(password);
+  const user = { id: crypto.randomUUID(), userNumber: Number(userNumber), uid: String(1000000000 + Number(userNumber)), phone, username: `user${userNumber}`, balance: STARTING_CREDITS, passwordSalt: credentials.salt, passwordHash: credentials.hash, createdAt: new Date().toISOString() };
+  const { error: insertError } = await supabase.from('crashzone_users').insert(dbUser(user));
+  if (insertError) return res.status(insertError.code === '23505' ? 409 : 500).json({ error: insertError.code === '23505' ? 'An account with this phone number already exists. Please log in.' : 'Account creation failed. Please try again.' });
+  database.users.push(user); setSession(res, user);
+  res.status(201).json({ user: publicAccount(user) });
+});
+app.post('/api/auth/login', async (req, res) => {
+  const phone = String(req.body?.phone || '').replace(/[\s()-]/g, '');
+  const password = String(req.body?.password || '');
+  let user = database.users.find(u => u.phone === phone);
+  if (!user) { const { data } = await supabase.from('crashzone_users').select('*').eq('phone', phone).maybeSingle(); if (data) { user = mapUser(data); database.users.push(user); } }
+  if (!user || !passwordMatches(password, user)) return res.status(401).json({ error: 'Incorrect phone number or password.' });
+  setSession(res, user); res.json({ user: publicAccount(user) });
+});
+app.post('/api/auth/logout', (req, res) => {
+  const token = parseCookies(req.headers.cookie).cz_session;
+  if (token) sessions.delete(token);
+  res.setHeader('Set-Cookie', 'cz_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
+  res.json({ ok: true });
+});
+app.patch('/api/auth/profile', authRequired, async (req, res) => {
+  const username = String(req.body?.username || '').trim();
+  if (!/^[A-Za-z0-9_]{3,18}$/.test(username)) return res.status(400).json({ error: 'Username must be 3–18 characters: letters, numbers, or underscores.' });
+  if (database.users.some(u => u.id !== req.account.id && u.username.toLowerCase() === username.toLowerCase())) return res.status(409).json({ error: 'That username is already taken.' });
+  const { error: profileError } = await supabase.from('crashzone_users').update({ username }).eq('id', req.account.id);
+  if (profileError) return res.status(profileError.code === '23505' ? 409 : 500).json({ error: profileError.code === '23505' ? 'That username is already taken.' : 'Could not save your profile.' });
+  req.account.username = username;
+  for (const [socketId, player] of players) if (player.userId === req.account.id) { player.name = username; const sock = io.sockets.sockets.get(socketId); if (sock) sendPlayer(sock); }
+  broadcast(); res.json({ user: publicAccount(req.account) });
+});
 app.get('/health', (_req, res) => res.json({
   status: 'ok', game: 'CrashZone Aviator', phase: state.phase, round: state.roundId
 }));
@@ -64,7 +171,11 @@ function multiplierAtElapsed(ms) {
   return Math.max(1, Math.exp(Math.max(0, ms) / 9000));
 }
 function publicPlayer(p) {
-  return { id: p.id, name: p.name, balance: p.balance };
+  return { id: p.id, name: p.name, balance: p.balance, uid: p.uid };
+}
+function persistBalance(player) {
+  const user = database.users.find(u => u.id === player.userId);
+  if (user) { user.balance = player.balance; void saveUser(user); }
 }
 function snapshot() {
   return {
@@ -108,6 +219,7 @@ function cashoutPlayer(id, multiplier, automatic = false) {
   bet.payout = payout;
   bet.automatic = automatic;
   current.balance += payout;
+  persistBalance(current);
   io.to(id).emit('bet:result', {
     status: 'cashed_out', amount: bet.amount, multiplier: bet.multiplier,
     payout, balance: current.balance, automatic
@@ -134,8 +246,17 @@ function finishRound(point) {
   }
   broadcast();
 }
+io.use((socket, next) => {
+  const token = parseCookies(socket.handshake.headers.cookie).cz_session;
+  const userId = token && sessions.get(token);
+  const user = userId && database.users.find(u => u.id === userId);
+  if (!user) return next(new Error('AUTH_REQUIRED'));
+  socket.data.accountId = user.id; next();
+});
 io.on('connection', socket => {
-  const p = { id: socket.id, name: `Pilot-${socket.id.slice(0, 4)}`, balance: STARTING_CREDITS };
+  const account = database.users.find(u => u.id === socket.data.accountId);
+  if (!account) return socket.disconnect(true);
+  const p = { id: socket.id, userId: account.id, uid: account.uid, name: account.username, balance: account.balance };
   players.set(socket.id, p);
   state.online = players.size;
   socket.emit('game:state', snapshot());
@@ -170,6 +291,7 @@ io.on('connection', socket => {
     }
     if (amount > current.balance) return socket.emit('game:error', 'Not enough virtual credits.');
     current.balance -= amount;
+    persistBalance(current);
     bets.set(socket.id, { amount, cashedOut: false, status: 'active', roundId: state.roundId + 1, autoCashout });
     sendPlayer(socket);
     broadcast();
@@ -228,7 +350,10 @@ setInterval(() => {
   }
 }, TICK_MS);
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`CrashZone Aviator listening on port ${PORT}`);
-  console.log(`Serving ${PUBLIC_DIR}`);
-});
+loadDatabase().then(() => {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`CrashZone Aviator listening on port ${PORT}`);
+    console.log(`Loaded ${database.users.length} CrashZone accounts from Supabase`);
+    console.log(`Serving ${PUBLIC_DIR}`);
+  });
+}).catch(error => { console.error(error.message); process.exit(1); });
