@@ -76,11 +76,33 @@ function startRound() {
   state.crashPoint = null;
   state.roundStartedAt = Date.now();
   state.nextRoundAt = null;
-  bets.clear();
+  // Keep bets placed during the countdown; they belong to the round that just started.
+  for (const bet of bets.values()) bet.roundId = state.roundId;
   const point = randomCrashPoint();
   targetCrashAtMs = elapsedForMultiplier(point);
   state._target = point;
   broadcast();
+}
+function cashoutPlayer(id, multiplier, automatic = false) {
+  const current = players.get(id);
+  const bet = bets.get(id);
+  if (!current || !bet || bet.cashedOut || bet.status !== 'active') return false;
+  const safeMultiplier = Number(multiplier.toFixed(2));
+  const payout = Math.floor(bet.amount * safeMultiplier);
+  bet.cashedOut = true;
+  bet.status = 'cashed_out';
+  bet.multiplier = safeMultiplier;
+  bet.payout = payout;
+  bet.automatic = automatic;
+  current.balance += payout;
+  io.to(id).emit('bet:result', {
+    status: 'cashed_out', amount: bet.amount, multiplier: bet.multiplier,
+    payout, balance: current.balance, automatic
+  });
+  const sock = io.sockets.sockets.get(id);
+  if (sock) sendPlayer(sock);
+  broadcast();
+  return true;
 }
 function finishRound(point) {
   state.phase = 'crashed';
@@ -119,15 +141,19 @@ io.on('connection', socket => {
   socket.on('bet:place', raw => {
     const current = players.get(socket.id);
     if (!current) return;
-    if (state.phase !== 'waiting') return socket.emit('game:error', 'Bets are closed for this round.');
-    if (bets.has(socket.id)) return socket.emit('game:error', 'You already placed a bet for this round.');
+    if (state.phase !== 'waiting' && state.phase !== 'crashed') return socket.emit('game:error', 'Bets are closed for this round.');
+    const previousBet = bets.get(socket.id);
+    if (previousBet && previousBet.status === 'active') return socket.emit('game:error', 'You already have an active bet.');
+    if (previousBet) bets.delete(socket.id);
     const amount = Number(raw && raw.amount);
+    const autoCashoutRaw = Number(raw && raw.autoCashout);
+    const autoCashout = Number.isFinite(autoCashoutRaw) && autoCashoutRaw >= 1.01 && autoCashoutRaw <= 100 ? Math.round(autoCashoutRaw * 100) / 100 : null;
     if (!Number.isInteger(amount) || amount < 1 || amount > MAX_BET) {
       return socket.emit('game:error', `Bet must be 1–${MAX_BET} virtual credits.`);
     }
     if (amount > current.balance) return socket.emit('game:error', 'Not enough virtual credits.');
     current.balance -= amount;
-    bets.set(socket.id, { amount, cashedOut: false, status: 'active', roundId: state.roundId });
+    bets.set(socket.id, { amount, cashedOut: false, status: 'active', roundId: state.roundId + 1, autoCashout });
     sendPlayer(socket);
     broadcast();
   });
@@ -146,18 +172,7 @@ io.on('connection', socket => {
       return socket.emit('game:error', 'Too late — the plane has crashed.');
     }
     const multiplier = Math.min(state._target, multiplierAtElapsed(elapsed));
-    const payout = Math.floor(bet.amount * multiplier);
-    bet.cashedOut = true;
-    bet.status = 'cashed_out';
-    bet.multiplier = Number(multiplier.toFixed(2));
-    bet.payout = payout;
-    current.balance += payout;
-    socket.emit('bet:result', {
-      status: 'cashed_out', amount: bet.amount, multiplier: bet.multiplier,
-      payout, balance: current.balance
-    });
-    sendPlayer(socket);
-    broadcast();
+    cashoutPlayer(socket.id, multiplier, false);
   });
 
   socket.on('disconnect', () => {
@@ -182,6 +197,11 @@ setInterval(() => {
       return;
     }
     state.multiplier = Number(multiplierAtElapsed(elapsed).toFixed(2));
+    for (const [id, bet] of bets) {
+      if (bet.status === 'active' && bet.autoCashout && state.multiplier >= bet.autoCashout && elapsed < targetCrashAtMs) {
+        cashoutPlayer(id, bet.autoCashout, true);
+      }
+    }
     broadcast();
   }
 }, TICK_MS);
