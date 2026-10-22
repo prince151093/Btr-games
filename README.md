@@ -41,3 +41,11 @@ The server expects `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` at startup and
 - A PostgreSQL sequence guarantees unique account numbers under concurrent sign-ups, but sequence numbers can have gaps if an account insert fails; never assume there are no gaps.
 - Existing accounts in a previous local `users.json` file are **not automatically migrated**. Import them deliberately if needed; do not upload password hashes or account data to a public location.
 - This is a demo virtual-credit game, not a production-grade real-money gambling platform. Before public launch, add rate limiting, monitoring, robust balance transactions, and a review of game fairness and account recovery.
+
+## Mini-game payout and bet rules
+
+- Big/Small direct picks return 1.9x the stake when correct (gross return includes the stake).
+- Exact-number Big/Small bets share an 8x total-return pool multiplier divided by the count of exact-number selections in that round (1 pick = 8x, 2 = 4x, 3 = 2.67x, 4 = 2x, 5 = 1.6x). Direct BIG/SMALL picks do not change this count.
+- Color Prediction returns 7x on a correct color; Lucky Number returns 8x on a correct number. Multipliers are gross returns including the stake.
+- A maximum of five distinct selections is enforced per player per round. Each selection has its own stake; all accepted stakes are deducted up front and wins are credited at settlement.
+- Prediction-game balances use virtual credits only. The listed multipliers imply different house edges: approximately 5% for BIG/SMALL, 12.5% for an equally likely eight-color game, and 20% for exact-number picks.

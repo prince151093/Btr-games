@@ -169,7 +169,10 @@ setInterval(() => {
           if (wager.settled) continue;
           const isDigitPick = type === 'bigsmall' && /^[0-9]$/.test(wager.pick);
           const won = type === 'bigsmall' ? (isDigitPick ? Number(wager.pick) === g.result : wager.pick === 'big' ? g.result >= 5 : g.result <= 4) : wager.pick === String(g.result);
-          const multiplier = isDigitPick ? ({1:8,2:6,3:4}[wagers.length] || 2) : MINI_CONFIG[type].payout;
+          const exactNumberCount = type === 'bigsmall' ? wagers.filter(w => /^[0-9]$/.test(w.pick)).length : 0;
+          // Fair, transparent gross-return multipliers: 8 / number of exact digits selected.
+          // Side bets (BIG/SMALL) do not change the exact-number multiplier.
+          const multiplier = isDigitPick ? 8 / Math.max(1, exactNumberCount) : MINI_CONFIG[type].payout;
           const payout = won ? Math.floor(wager.amount * multiplier) : 0;
           player.balance += payout; wager.settled = true; wager.status = won ? 'won' : 'lost'; wager.payout = payout;
           io.to(socketId).emit('mini:result', { type, roundId: g.roundId, pick: wager.pick, result: g.result, amount: wager.amount, won, payout, balance: player.balance, multiplier });
