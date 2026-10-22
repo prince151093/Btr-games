@@ -1,10 +1,13 @@
 {
-  "name": "crash-zone-shared-rounds",
-  "version": "1.0.0",
+  "name": "crash-zone-shared-round",
+  "version": "1.1.0",
   "private": true,
-  "description": "Shared server-authoritative CRASH ZONE practice rounds",
+  "description": "Server-authoritative shared multiplier rounds for CrashZone",
   "main": "server.js",
-  "scripts": {"start": "node server.js"},
-  "engines": {"node": ">=18"},
-  "dependencies": {"express": "^4.21.2", "socket.io": "^4.8.1"}
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
 }
