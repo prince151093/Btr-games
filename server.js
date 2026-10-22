@@ -209,12 +209,9 @@ setInterval(() => {
       finishRound(state._target);
       return;
     }
-    const liveMultiplier = multiplierAtElapsed(elapsed);
-    state.multiplier = Number(liveMultiplier.toFixed(2));
+    state.multiplier = Number(multiplierAtElapsed(elapsed).toFixed(2));
     for (const [id, bet] of bets) {
-      // Trigger against the unrounded server multiplier to avoid missing a target
-      // between display ticks. Never auto-cash out at or after the crash instant.
-      if (bet.status === 'active' && bet.autoCashout && liveMultiplier >= bet.autoCashout && elapsed < targetCrashAtMs) {
+      if (bet.status === 'active' && bet.autoCashout && state.multiplier >= bet.autoCashout && elapsed < targetCrashAtMs) {
         cashoutPlayer(id, bet.autoCashout, true);
       }
     }
