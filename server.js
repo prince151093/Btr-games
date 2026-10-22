@@ -165,10 +165,12 @@ setInterval(() => {
       g.resultVisible = true; g.history.unshift({ roundId: g.roundId, result: g.result }); g.history = g.history.slice(0, 500);
       for (const [socketId, wager] of g.wagers) {
         const player = players.get(socketId); if (!player || wager.settled) continue;
-        const won = type === 'bigsmall' ? (wager.pick === 'big' ? g.result >= 5 : g.result <= 4) : wager.pick === String(g.result);
-        let payout = 0; if (won) payout = Math.floor(wager.amount * MINI_CONFIG[type].payout);
+        const isDigitPick = type === 'bigsmall' && /^[0-9]$/.test(wager.pick);
+        const won = type === 'bigsmall' ? (isDigitPick ? Number(wager.pick) === g.result : wager.pick === 'big' ? g.result >= 5 : g.result <= 4) : wager.pick === String(g.result);
+        const multiplier = isDigitPick ? 8 : MINI_CONFIG[type].payout;
+        let payout = 0; if (won) payout = Math.floor(wager.amount * multiplier);
         player.balance += payout; persistBalance(player); wager.settled = true; wager.status = won ? 'won' : 'lost'; wager.payout = payout;
-        io.to(socketId).emit('mini:result', { type, roundId: g.roundId, pick: wager.pick, result: g.result, amount: wager.amount, won, payout, balance: player.balance, multiplier: MINI_CONFIG[type].payout });
+        io.to(socketId).emit('mini:result', { type, roundId: g.roundId, pick: wager.pick, result: g.result, amount: wager.amount, won, payout, balance: player.balance, multiplier });
         const sock = io.sockets.sockets.get(socketId); if (sock) sendPlayer(sock);
       }
       broadcastMini(type);
@@ -325,7 +327,7 @@ io.on('connection', socket => {
     if (Date.now() >= g.closesAt || g.resultVisible) return socket.emit('game:error', 'Betting is closed for this round.');
     if (g.wagers.has(socket.id)) return socket.emit('game:error', 'You have already entered this round.');
     const amount = Number(raw.amount); const pick = String(raw.pick);
-    const validPick = type === 'bigsmall' ? ['big','small'].includes(pick) : type === 'color' ? ['blue','green','yellow','red','pink','violet','black','orange'].includes(pick) : /^[0-9]$/.test(pick);
+    const validPick = type === 'bigsmall' ? (['big','small'].includes(pick) || /^[0-9]$/.test(pick)) : type === 'color' ? ['blue','green','yellow','red','pink','violet','black','orange'].includes(pick) : /^[0-9]$/.test(pick);
     if (!validPick) return socket.emit('game:error', 'Choose a valid option.');
     if (!Number.isInteger(amount) || amount < 1 || amount > MINI_MAX_BET) return socket.emit('game:error', `Bet must be 1–${MINI_MAX_BET} virtual credits.`);
     if (amount > current.balance) return socket.emit('game:error', 'Not enough virtual credits.');
