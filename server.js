@@ -163,15 +163,18 @@ setInterval(() => {
     let g = miniGames.get(type);
     if (now >= g.revealAt && !g.resultVisible) {
       g.resultVisible = true; g.history.unshift({ roundId: g.roundId, result: g.result }); g.history = g.history.slice(0, 500);
-      for (const [socketId, wager] of g.wagers) {
-        const player = players.get(socketId); if (!player || wager.settled) continue;
-        const isDigitPick = type === 'bigsmall' && /^[0-9]$/.test(wager.pick);
-        const won = type === 'bigsmall' ? (isDigitPick ? Number(wager.pick) === g.result : wager.pick === 'big' ? g.result >= 5 : g.result <= 4) : wager.pick === String(g.result);
-        const multiplier = isDigitPick ? 8 : MINI_CONFIG[type].payout;
-        let payout = 0; if (won) payout = Math.floor(wager.amount * multiplier);
-        player.balance += payout; persistBalance(player); wager.settled = true; wager.status = won ? 'won' : 'lost'; wager.payout = payout;
-        io.to(socketId).emit('mini:result', { type, roundId: g.roundId, pick: wager.pick, result: g.result, amount: wager.amount, won, payout, balance: player.balance, multiplier });
-        const sock = io.sockets.sockets.get(socketId); if (sock) sendPlayer(sock);
+      for (const [socketId, wagers] of g.wagers) {
+        const player = players.get(socketId); if (!player) continue;
+        for (const wager of wagers) {
+          if (wager.settled) continue;
+          const isDigitPick = type === 'bigsmall' && /^[0-9]$/.test(wager.pick);
+          const won = type === 'bigsmall' ? (isDigitPick ? Number(wager.pick) === g.result : wager.pick === 'big' ? g.result >= 5 : g.result <= 4) : wager.pick === String(g.result);
+          const multiplier = isDigitPick ? ({1:8,2:6,3:4}[wagers.length] || 2) : MINI_CONFIG[type].payout;
+          const payout = won ? Math.floor(wager.amount * multiplier) : 0;
+          player.balance += payout; wager.settled = true; wager.status = won ? 'won' : 'lost'; wager.payout = payout;
+          io.to(socketId).emit('mini:result', { type, roundId: g.roundId, pick: wager.pick, result: g.result, amount: wager.amount, won, payout, balance: player.balance, multiplier });
+        }
+        persistBalance(player); const sock = io.sockets.sockets.get(socketId); if (sock) sendPlayer(sock);
       }
       broadcastMini(type);
       setTimeout(() => startMiniRound(type), 1800);
@@ -325,15 +328,18 @@ io.on('connection', socket => {
     const type = String(raw && raw.type || ''); const g = miniGames.get(type);
     if (!g || !MINI_CONFIG[type]) return socket.emit('game:error', 'Unknown game.');
     if (Date.now() >= g.closesAt || g.resultVisible) return socket.emit('game:error', 'Betting is closed for this round.');
-    if (g.wagers.has(socket.id)) return socket.emit('game:error', 'You have already entered this round.');
-    const amount = Number(raw.amount); const pick = String(raw.pick);
-    const validPick = type === 'bigsmall' ? (['big','small'].includes(pick) || /^[0-9]$/.test(pick)) : type === 'color' ? ['blue','green','yellow','red','pink','violet','black','orange'].includes(pick) : /^[0-9]$/.test(pick);
-    if (!validPick) return socket.emit('game:error', 'Choose a valid option.');
-    if (!Number.isInteger(amount) || amount < 1 || amount > MINI_MAX_BET) return socket.emit('game:error', `Bet must be 1–${MINI_MAX_BET} virtual credits.`);
-    if (amount > current.balance) return socket.emit('game:error', 'Not enough virtual credits.');
-    current.balance -= amount; persistBalance(current);
-    g.wagers.set(socket.id, { amount, pick, settled: false });
-    socket.emit('mini:bet:accepted', { type, roundId: g.roundId, amount, pick, balance: current.balance });
+    const picks = [...new Set((Array.isArray(raw.picks) ? raw.picks : [raw.pick]).map(v => String(v)))];
+    const validPick = pick => type === 'bigsmall' ? (['big','small'].includes(pick) || /^[0-9]$/.test(pick)) : type === 'color' ? ['blue','green','yellow','red','pink','violet','black','orange'].includes(pick) : /^[0-9]$/.test(pick);
+    if (!picks.length || picks.length > 10 || picks.some(pick => !validPick(pick))) return socket.emit('game:error', 'Choose valid options.');
+    if (picks.some(pick => (g.wagers.get(socket.id) || []).some(w => w.pick === pick))) return socket.emit('game:error', 'You already placed a bid on one of these options this round.');
+    const amount = Number(raw.amount);
+    if (!Number.isInteger(amount) || amount < 1 || amount > MINI_MAX_BET) return socket.emit('game:error', `Each bid must be 1–${MINI_MAX_BET} virtual credits.`);
+    const total = amount * picks.length;
+    if (total > current.balance) return socket.emit('game:error', `Not enough virtual credits for ${picks.length} bids (${total} total).`);
+    current.balance -= total; persistBalance(current);
+    const wagers = g.wagers.get(socket.id) || [];
+    picks.forEach(pick => wagers.push({ amount, pick, settled: false })); g.wagers.set(socket.id, wagers);
+    socket.emit('mini:bet:accepted', { type, roundId: g.roundId, amount, total, picks, balance: current.balance });
     sendPlayer(socket); broadcast();
   });
 
@@ -342,8 +348,7 @@ io.on('connection', socket => {
     if (!current) return;
     if (state.phase !== 'waiting' && state.phase !== 'crashed') return socket.emit('game:error', 'Bets are closed for this round.');
     const previousBet = bets.get(socket.id);
-    if (previousBet && previousBet.status === 'active') return socket.emit('game:error', 'You already have an active bet.');
-    if (previousBet) bets.delete(socket.id);
+    if (previousBet && previousBet.status !== 'active') bets.delete(socket.id);
     const amount = Number(raw && raw.amount);
     const autoValue = raw && raw.autoCashout;
     const autoCashoutRaw = autoValue === null || autoValue === undefined || String(autoValue).trim() === '' ? null : Number(autoValue);
@@ -357,7 +362,14 @@ io.on('connection', socket => {
     if (amount > current.balance) return socket.emit('game:error', 'Not enough virtual credits.');
     current.balance -= amount;
     persistBalance(current);
-    bets.set(socket.id, { amount, cashedOut: false, status: 'active', roundId: state.roundId + 1, autoCashout });
+    if (previousBet && previousBet.status === 'active') {
+      previousBet.amount += amount;
+      if (autoCashout !== null) previousBet.autoCashout = autoCashout;
+      previousBet.bids = (previousBet.bids || 1) + 1;
+      socket.emit('bet:added', { amount, totalAmount: previousBet.amount, bids: previousBet.bids, balance: current.balance });
+    } else {
+      bets.set(socket.id, { amount, bids: 1, cashedOut: false, status: 'active', roundId: state.roundId + 1, autoCashout });
+    }
     sendPlayer(socket);
     broadcast();
   });
