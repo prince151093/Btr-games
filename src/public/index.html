@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CrashZone — Aviator</title>
+<title>CrashZone — Game Lobby</title>
 <style>
 :root{color-scheme:dark;--bg:#090d17;--panel:#111a2b;--panel2:#18243a;--line:#283851;--muted:#9baec8;--red:#ff4259;--green:#40e6a0;--text:#f5f7fb}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -20%,#1b2c49 0,#090d17 55%);font:15px system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);min-height:100vh}
@@ -35,11 +35,42 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
 .activity{grid-column:2;padding:16px 18px;min-width:0}.activity-list{display:grid;gap:8px;max-height:520px;overflow:auto}.activity-item{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:12px 10px;background:#0b1321;border-radius:10px;color:#aebfd6;font-size:13px;overflow-wrap:anywhere}.activity-item strong{color:#f5f7fb;font-size:18px}
 .toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#26344a;border:1px solid #415777;border-radius:10px;padding:12px 16px;z-index:10;transition:.2s;max-width:90vw}.toast.show{opacity:1;transform:translate(-50%,0)}.disclaimer{text-align:center;color:#71839e;font-size:11px;padding:0 16px 22px}
 @media(max-width:760px){main{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:10px;gap:10px}.flight,main>section:nth-child(2){grid-column:1/-1}.flight{min-height:340px}.history-wrap{grid-column:1;padding:12px 10px}.activity{grid-column:2;padding:12px 10px}.section-title{font-size:12px;letter-spacing:.2px;overflow-wrap:anywhere}.chip{font-size:clamp(17px,4.5vw,22px);min-height:44px;padding:9px 10px}.activity-list{max-height:unset;overflow:visible}.activity-item{padding:9px 8px;font-size:11px}.activity-item strong{font-size:16px}header{padding:14px 16px}.multiplier{top:72px}.takeoff-timer strong{font-size:clamp(100px,32vw,180px)}.online{font-size:11px;white-space:nowrap}}
+
+/* Compact expandable game lobby */
+.lobby{max-width:1100px;margin:0 auto;padding:18px 16px 90px}
+.lobby-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+.lobby-kicker{color:var(--muted);font-size:12px;margin-top:3px}
+.coin-pill{display:flex;align-items:center;gap:8px;background:#18243a;border:1px solid #34445f;border-radius:14px;padding:10px 13px;white-space:nowrap}
+.coin-icon{font-size:20px}.coin-label{font-size:10px;color:var(--muted);letter-spacing:.6px}.coin-value{font-size:17px;font-weight:900;color:#ffd36c;font-variant-numeric:tabular-nums}
+.lobby-heading{display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px;font-weight:850;font-size:16px}
+.game-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.game-card{min-width:0;border:1px solid var(--line);border-radius:15px;padding:10px;background:linear-gradient(145deg,#18243a,#101827);color:var(--text);text-align:left;cursor:pointer;transition:transform .15s,border-color .15s;}
+.game-card:active{transform:scale(.98)}.game-card:hover{border-color:#607ba5}
+.game-art{height:95px;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(circle at 50% 80%,#473044,#171e31 62%,#101522);margin-bottom:9px}
+.game-art svg{width:72px;height:72px;filter:drop-shadow(0 6px 15px #ff425966)}
+.game-title{font-weight:850;font-size:14px}.game-caption{color:var(--muted);font-size:11px;margin-top:3px}
+.game-card.add-card{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:160px;border-style:dashed;background:#111827;color:var(--muted);text-align:center}.add-symbol{font-size:30px;color:#8295b0;line-height:1.2}
+.lobby-note{color:#8191a8;font-size:11px;margin-top:13px}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:8;display:flex;justify-content:space-around;gap:4px;padding:9px 8px calc(9px + env(safe-area-inset-bottom));background:#0b101beF;border-top:1px solid #ffffff16;backdrop-filter:blur(14px)}
+.nav-item{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:11px;padding:5px 2px;cursor:pointer}.nav-item b{display:block;font-size:18px;margin-bottom:2px}.nav-item.active{color:#ffd36c}
+#gameView{display:none}#gameView.open{display:block}.back-row{max-width:1100px;margin:10px auto 0;padding:0 16px} .back-btn{background:#1a263a;color:#dce7f8;border:1px solid var(--line);padding:8px 12px;border-radius:10px;font-weight:700}
+body.game-mode .lobby,body.game-mode .bottom-nav{display:none}body.game-mode #gameView{display:block}body.game-mode header .online{display:none}body.game-mode header{position:relative}
+@media(max-width:500px){.lobby{padding:14px 12px 90px}.game-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.game-card{padding:7px;border-radius:12px}.game-art{height:76px}.game-title{font-size:12px}.game-caption{font-size:10px}.coin-pill{padding:8px 9px}.coin-value{font-size:15px}.lobby-top .logo{font-size:18px}.game-card.add-card{min-height:130px}}
+
 </style>
 </head>
 <body>
-<header><div class="logo">CRASH<span>ZONE</span> <span style="color:#a9bad3;font-size:11px;letter-spacing:2px">AVIATOR</span></div><div class="online">● <span id="online">0</span> pilots online</div></header>
-<main>
+<header><div class="logo">CRASH<span>ZONE</span></div><div class="coin-pill" id="headerCoins"><span class="coin-icon">🪙</span><div><div class="coin-label">TOTAL COINS</div><div class="coin-value" id="lobbyBalance">1,000</div></div></div><div class="online">● <span id="online">0</span> pilots online</div></header>
+<section class="lobby" id="lobbyView">
+ <div class="lobby-top"><div><div class="logo">GAME LOBBY</div><div class="lobby-kicker">Choose a game to play</div></div><div class="coin-pill"><span class="coin-icon">🪙</span><div><div class="coin-label">YOUR BALANCE</div><div class="coin-value" id="lobbyBalance2">1,000</div></div></div></div>
+ <div class="lobby-heading"><span>All Games</span><span class="muted" style="font-size:12px;font-weight:600">1 available</span></div>
+ <div class="game-grid" id="gameGrid">
+  <button class="game-card" id="openAviator" type="button"><div class="game-art"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M7 55 L43 43 L62 12 Q66 7 70 12 L65 40 L91 47 Q97 50 91 54 L64 60 L54 86 Q51 92 47 86 L42 63 Z" fill="#ff4057" stroke="#ff9aa6" stroke-width="2"/><path d="M19 54 L43 51 L48 59 Z" fill="#ffd5d9"/></svg></div><div class="game-title">Aviator</div><div class="game-caption">CrashZone Original</div></button>
+  <div class="game-card add-card" aria-label="More games coming soon"><div class="add-symbol">＋</div><div class="game-title">More games</div><div class="game-caption">Coming soon</div></div>
+ </div><div class="lobby-note">Virtual credits only. More games can be added to this grid later.</div>
+</section>
+<nav class="bottom-nav" id="bottomNav"><button class="nav-item active" type="button" data-nav="home"><b>⌂</b>Home</button><button class="nav-item" type="button" data-nav="activity"><b>◷</b>Activity</button><button class="nav-item" type="button" data-nav="wallet"><b>◈</b>Wallet</button><button class="nav-item" type="button" data-nav="account"><b>◎</b>Account</button></nav>
+<div id="gameView"><div class="back-row"><button class="back-btn" id="backToLobby" type="button">← Back to lobby</button></div><main>
 <section class="panel flight">
  <div class="sky-label">FLIGHT STATUS / LIVE ROUND</div><div id="status" class="status">CONNECTING</div>
  <div id="takeoffTimer" class="takeoff-timer">TAKEOFF IN <strong id="countdownValue">—</strong></div>
@@ -67,6 +98,24 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
 <div id="toast" class="toast"></div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
+// Compact lobby navigation; the existing Aviator game remains mounted so its state and socket stay alive.
+(()=>{
+ const body=document.body, lobby=document.getElementById('lobbyView'), game=document.getElementById('gameView');
+ const open=()=>{body.classList.add('game-mode');window.scrollTo({top:0,behavior:'smooth'});};
+ const back=()=>{body.classList.remove('game-mode');window.scrollTo({top:0,behavior:'smooth'});};
+ document.getElementById('openAviator')?.addEventListener('click',open);
+ document.getElementById('backToLobby')?.addEventListener('click',back);
+ document.querySelectorAll('[data-nav]').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b===btn));
+  if(btn.dataset.nav==='home') back();
+  else if(btn.dataset.nav==='activity') { open(); setTimeout(()=>document.querySelector('.activity')?.scrollIntoView({behavior:'smooth',block:'start'}),80); }
+  else if(btn.dataset.nav==='wallet') { open(); setTimeout(()=>document.querySelector('.controls')?.scrollIntoView({behavior:'smooth',block:'start'}),80); }
+  else if(btn.dataset.nav==='account') { open(); setTimeout(()=>document.querySelector('.balance-line')?.scrollIntoView({behavior:'smooth',block:'start'}),80); }
+ }));
+ const syncBalance=()=>{const v=document.getElementById('balance')?.textContent?.trim()||'1,000';['lobbyBalance','lobbyBalance2'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=v;});};
+ new MutationObserver(syncBalance).observe(document.getElementById('balance')||document.body,{childList:true,subtree:true,characterData:true}); syncBalance();
+})();
+
 (() => {
  const socket = io();
  const $ = id => document.getElementById(id);
