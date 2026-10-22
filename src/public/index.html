@@ -15,7 +15,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
 .flight:before{content:"";position:absolute;inset:0;background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:42px 42px;transform:perspective(260px) rotateX(22deg) scale(1.4);transform-origin:bottom}
 .sky-label{position:absolute;top:16px;left:18px;color:#a8bbd5;font-size:12px;letter-spacing:1.4px;font-weight:700}
 .status{position:absolute;right:16px;top:14px;border:1px solid #ffffff20;border-radius:999px;padding:6px 10px;font-size:11px;color:#c6d6e9;background:#111a2bcc}
-.takeoff-timer{position:absolute;left:50%;top:54px;transform:translateX(-50%);z-index:2;padding:8px 14px;border:1px solid #ffffff24;border-radius:12px;background:#080d17d9;color:#fff;text-align:center;white-space:nowrap;font-size:clamp(13px,2vw,17px);font-weight:850;box-shadow:0 8px 24px #0004}.takeoff-timer strong{color:#ff6477;font-variant-numeric:tabular-nums}.takeoff-timer.flying strong{color:#68efb0}
+.takeoff-timer{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:2;background:#070d18b8;color:#dce7f8;text-align:center;font-size:clamp(16px,3vw,24px);font-weight:900;letter-spacing:1.5px;text-shadow:0 3px 18px #000;pointer-events:none}.takeoff-timer strong{display:block;color:#ff5369;font-size:clamp(88px,24vw,190px);line-height:.95;letter-spacing:-5px;font-variant-numeric:tabular-nums;text-shadow:0 0 36px #ff425955}.takeoff-timer.flying{inset:14px auto auto 50%;transform:translateX(-50%);height:auto;display:block;padding:8px 14px;border:1px solid #ffffff24;border-radius:12px;background:#080d17d9;font-size:12px;letter-spacing:.5px;white-space:nowrap}.takeoff-timer.flying strong{display:inline;font-size:14px;letter-spacing:0;text-shadow:none;color:#68efb0}
 .multiplier{position:absolute;top:76px;width:100%;text-align:center;font-size:clamp(48px,8vw,82px);font-weight:900;letter-spacing:-3px;text-shadow:0 0 30px #ff455933;font-variant-numeric:tabular-nums}
 .multiplier.running{color:#fff}.multiplier.crashed{color:var(--red)}.multiplier.waiting{color:#d7e3f5}
 .trail{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
@@ -30,7 +30,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
 .history-wrap{grid-column:1/-1;padding:16px 18px}.section-title{font-size:14px;font-weight:800;letter-spacing:.5px;margin-bottom:13px}.history{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:8px 12px;border-radius:999px;background:#273247;color:#d9e4f4;font-size:13px;font-weight:800}.chip.low{background:#42202c;color:#ff8996}.chip.mid{background:#263b37;color:#6fe7b1}.chip.high{background:#293554;color:#9bb9ff}
 .activity{grid-column:1/-1;padding:16px 18px}.activity-list{display:grid;gap:8px;max-height:170px;overflow:auto}.activity-item{display:flex;justify-content:space-between;padding:9px 10px;background:#0b1321;border-radius:8px;color:#aebfd6;font-size:13px}.activity-item strong{color:#f5f7fb}
 .toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#26344a;border:1px solid #415777;border-radius:10px;padding:12px 16px;z-index:10;transition:.2s;max-width:90vw}.toast.show{opacity:1;transform:translate(-50%,0)}.disclaimer{text-align:center;color:#71839e;font-size:11px;padding:0 16px 22px}
-@media(max-width:760px){main{grid-template-columns:1fr;padding:12px}.flight{min-height:300px}.history-wrap,.activity{grid-column:auto}header{padding:14px 16px}.multiplier{top:72px}}
+@media(max-width:760px){main{grid-template-columns:1fr;padding:12px}.flight{min-height:420px}.history-wrap,.activity{grid-column:auto}header{padding:14px 16px}.multiplier{top:72px}.takeoff-timer strong{font-size:clamp(100px,32vw,180px)}}
 </style>
 </head>
 <body>
@@ -95,7 +95,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
   const timer=$('takeoffTimer');
   const countdown=$('countdownValue');
   if(game.phase==='running'){timer.classList.add('flying');timer.innerHTML='PLANE IN FLIGHT · <strong>LIVE</strong>';countdown.textContent='LIVE';$('timerText').textContent='Cash out before the crash';}
-  else {timer.classList.remove('flying');const ms=Math.max(0,(Number(game.nextRoundAt)||Date.now())-(Date.now()+serverOffset));const seconds=(ms/1000).toFixed(1)+'s';timer.innerHTML='TAKEOFF IN <strong id="countdownValue">'+seconds+'</strong>'; $('timerText').textContent=game.phase==='crashed'?'Crashed at '+Number(game.crashPoint||1).toFixed(2)+'×':'Place your bet before takeoff';}
+  else {timer.classList.remove('flying');const ms=Math.max(0,(Number(game.nextRoundAt)||Date.now())-(Date.now()+serverOffset));const seconds=Math.max(1,Math.ceil(ms/1000));timer.innerHTML='TAKEOFF IN <strong id="countdownValue">'+seconds+'</strong>'; $('timerText').textContent=game.phase==='crashed'?'Crashed at '+Number(game.crashPoint||1).toFixed(2)+'×':'Place your bet before takeoff';}
   $('history').replaceChildren();
   if(!game.history||!game.history.length){const s=document.createElement('span');s.className='muted';s.textContent='Waiting for first round…';$('history').append(s)}
   else game.history.forEach(item=>{const c=document.createElement('span');c.className='chip '+(item.crashPoint<2?'low':item.crashPoint<10?'mid':'high');c.textContent=Number(item.crashPoint).toFixed(2)+'×';$('history').append(c)});
@@ -136,7 +136,7 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
  socket.on('game:error',msg=>toast(msg));
  render();
  setInterval(()=>{if(game.phase!=='running')renderCountdownOnly()},100);
- function renderCountdownOnly(){const el=$('countdownValue');if(!el||game.phase==='running')return;const ms=Math.max(0,(Number(game.nextRoundAt)||Date.now())-(Date.now()-serverOffset));el.textContent=(ms/1000).toFixed(1)+'s';}
+ function renderCountdownOnly(){const el=$('countdownValue');if(!el||game.phase==='running')return;const ms=Math.max(0,(Number(game.nextRoundAt)||Date.now())-(Date.now()-serverOffset));el.textContent=String(Math.max(1,Math.ceil(ms/1000)));}
 })();
 </script>
 </body>
