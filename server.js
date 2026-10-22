@@ -18,7 +18,7 @@ app.get('/health', (_req, res) => res.json({
 }));
 app.get('/', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
-const WAIT_MS = 8000;
+const WAIT_MS = 15000;
 const TICK_MS = 100;
 const MAX_BET = 1000;
 const STARTING_CREDITS = 1000;
@@ -33,18 +33,17 @@ let state = {
 let targetCrashAtMs = null;
 
 function randomCrashPoint() {
-  // Demo-only weighted outcome table. Supplied weights total 105, so they are
-  // treated as relative weights and normalized across 105 tickets.
+  // Demo-only weighted outcome table. Supplied weights total 100.
   // The requested ranges leave 3.00x–4.00x and 1.01x–1.19x unassigned.
   const buckets = [
-    { weight: 10, min: 1.00, max: 1.00 },
+    { weight: 5, min: 1.00, max: 1.00 },
     { weight: 15, min: 1.20, max: 1.40 },
-    { weight: 15, min: 1.40, max: 1.60 },
-    { weight: 40, min: 1.60, max: 2.00 },
-    { weight: 10, min: 2.00, max: 3.00 },
+    { weight: 10, min: 1.40, max: 1.60 },
+    { weight: 30, min: 1.60, max: 2.00 },
+    { weight: 15, min: 2.00, max: 3.00 },
     { weight: 10, min: 4.00, max: 10.00 },
     { weight: 3, min: 10.00, max: 50.00 },
-    { weight: 2, min: 50.00, max: 100.00 }
+    { weight: 12, min: 50.00, max: 100.00 }
   ];
   const totalWeight = buckets.reduce((sum, bucket) => sum + bucket.weight, 0);
   let ticket = crypto.randomInt(0, totalWeight);
