@@ -54,15 +54,15 @@ main{max-width:1100px;margin:auto;padding:20px 16px 40px;display:grid;grid-templ
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:8;display:flex;justify-content:space-around;gap:4px;padding:9px 8px calc(9px + env(safe-area-inset-bottom));background:#0b101beF;border-top:1px solid #ffffff16;backdrop-filter:blur(14px)}
 .nav-item{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:11px;padding:5px 2px;cursor:pointer}.nav-item b{display:block;font-size:18px;margin-bottom:2px}.nav-item.active{color:#ffd36c}
 #gameView{display:none}#gameView.open{display:block}.back-row{max-width:1100px;margin:10px auto 0;padding:0 16px} .back-btn{background:#1a263a;color:#dce7f8;border:1px solid var(--line);padding:8px 12px;border-radius:10px;font-weight:700}
-body.game-mode .lobby,body.game-mode .bottom-nav{display:none}body.game-mode #gameView{display:block}body.game-mode header .online{display:none}body.game-mode header{position:relative}
+body.game-mode .lobby,body.game-mode .bottom-nav{display:none}body.game-mode #gameView{display:block}.game-online{display:none;max-width:1100px;margin:8px auto 0;padding:0 16px;text-align:right;color:var(--muted);font-size:12px}body.game-mode .game-online{display:block}body.game-mode header{position:relative}
 @media(max-width:500px){.lobby{padding:14px 12px 90px}.game-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.game-card{padding:7px;border-radius:12px}.game-art{height:76px}.game-title{font-size:12px}.game-caption{font-size:10px}.coin-pill{padding:8px 9px}.coin-value{font-size:15px}.lobby-top .logo{font-size:18px}.game-card.add-card{min-height:130px}}
 
 </style>
 </head>
 <body>
-<header><div class="logo">CRASH<span>ZONE</span></div><div class="coin-pill" id="headerCoins"><span class="coin-icon">🪙</span><div><div class="coin-label">TOTAL COINS</div><div class="coin-value" id="lobbyBalance">1,000</div></div></div><div class="online">● <span id="online">0</span> pilots online</div></header>
+<header><div class="logo">CRASH<span>ZONE</span></div><div class="coin-pill" id="headerCoins"><span class="coin-icon">🪙</span><div><div class="coin-label">TOTAL COINS</div><div class="coin-value" id="lobbyBalance">1,000</div></div></div></header>
 <section class="lobby" id="lobbyView">
- <div class="lobby-top"><div><div class="logo">GAME LOBBY</div><div class="lobby-kicker">Choose a game to play</div></div><div class="coin-pill"><span class="coin-icon">🪙</span><div><div class="coin-label">YOUR BALANCE</div><div class="coin-value" id="lobbyBalance2">1,000</div></div></div></div>
+ <div class="lobby-top"><div><div class="logo">GAME LOBBY</div><div class="lobby-kicker">Choose a game to play</div></div></div>
  <div class="lobby-heading"><span>All Games</span><span class="muted" style="font-size:12px;font-weight:600">1 available</span></div>
  <div class="game-grid" id="gameGrid">
   <button class="game-card" id="openAviator" type="button"><div class="game-art"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M7 55 L43 43 L62 12 Q66 7 70 12 L65 40 L91 47 Q97 50 91 54 L64 60 L54 86 Q51 92 47 86 L42 63 Z" fill="#ff4057" stroke="#ff9aa6" stroke-width="2"/><path d="M19 54 L43 51 L48 59 Z" fill="#ffd5d9"/></svg></div><div class="game-title">Aviator</div><div class="game-caption">CrashZone Original</div></button>
@@ -70,7 +70,7 @@ body.game-mode .lobby,body.game-mode .bottom-nav{display:none}body.game-mode #ga
  </div><div class="lobby-note">Virtual credits only. More games can be added to this grid later.</div>
 </section>
 <nav class="bottom-nav" id="bottomNav"><button class="nav-item active" type="button" data-nav="home"><b>⌂</b>Home</button><button class="nav-item" type="button" data-nav="activity"><b>◷</b>Activity</button><button class="nav-item" type="button" data-nav="wallet"><b>◈</b>Wallet</button><button class="nav-item" type="button" data-nav="account"><b>◎</b>Account</button></nav>
-<div id="gameView"><div class="back-row"><button class="back-btn" id="backToLobby" type="button">← Back to lobby</button></div><main>
+<div id="gameView"><div class="back-row"><button class="back-btn" id="backToLobby" type="button">← Back to lobby</button></div><div class="game-online">● <span id="online">0</span> pilots online</div><main>
 <section class="panel flight">
  <div class="sky-label">FLIGHT STATUS / LIVE ROUND</div><div id="status" class="status">CONNECTING</div>
  <div id="takeoffTimer" class="takeoff-timer">TAKEOFF IN <strong id="countdownValue">—</strong></div>
@@ -112,7 +112,7 @@ body.game-mode .lobby,body.game-mode .bottom-nav{display:none}body.game-mode #ga
   else if(btn.dataset.nav==='wallet') { open(); setTimeout(()=>document.querySelector('.controls')?.scrollIntoView({behavior:'smooth',block:'start'}),80); }
   else if(btn.dataset.nav==='account') { open(); setTimeout(()=>document.querySelector('.balance-line')?.scrollIntoView({behavior:'smooth',block:'start'}),80); }
  }));
- const syncBalance=()=>{const v=document.getElementById('balance')?.textContent?.trim()||'1,000';['lobbyBalance','lobbyBalance2'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=v;});};
+ const syncBalance=()=>{const v=document.getElementById('balance')?.textContent?.trim()||'1,000';['lobbyBalance'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=v;});};
  new MutationObserver(syncBalance).observe(document.getElementById('balance')||document.body,{childList:true,subtree:true,characterData:true}); syncBalance();
 })();
 
