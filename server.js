@@ -84,13 +84,17 @@ app.get('/api/auth/me', (req, res) => {
 app.post('/api/auth/signup', async (req, res) => {
   const phone = String(req.body?.phone || '').replace(/[\s()-]/g, '');
   const password = String(req.body?.password || '');
+  const requestedUsername = String(req.body?.username || '').trim();
   if (!/^\+?[0-9]{10,15}$/.test(phone)) return res.status(400).json({ error: 'Enter a valid phone number (10–15 digits).' });
   if (password.length < 8 || password.length > 128) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
   if (database.users.some(u => u.phone === phone)) return res.status(409).json({ error: 'An account with this phone number already exists. Please log in.' });
   const { data: userNumber, error: numberError } = await supabase.rpc('crashzone_next_user_number');
   if (numberError) return res.status(500).json({ error: 'Could not allocate an account number. Check the Supabase SQL setup.' });
+  const username = requestedUsername || `user${userNumber}`;
+  if (!/^[A-Za-z0-9_]{3,18}$/.test(username)) return res.status(400).json({ error: 'Username must be 3–18 characters: letters, numbers, or underscores.' });
+  if (database.users.some(u => u.username.toLowerCase() === username.toLowerCase())) return res.status(409).json({ error: 'That username is already taken. Choose another.' });
   const credentials = hashPassword(password);
-  const user = { id: crypto.randomUUID(), userNumber: Number(userNumber), uid: String(1000000000 + Number(userNumber)), phone, username: `user${userNumber}`, balance: STARTING_CREDITS, passwordSalt: credentials.salt, passwordHash: credentials.hash, createdAt: new Date().toISOString() };
+  const user = { id: crypto.randomUUID(), userNumber: Number(userNumber), uid: String(1000000000 + Number(userNumber)), phone, username, balance: STARTING_CREDITS, passwordSalt: credentials.salt, passwordHash: credentials.hash, createdAt: new Date().toISOString() };
   const { error: insertError } = await supabase.from('crashzone_users').insert(dbUser(user));
   if (insertError) return res.status(insertError.code === '23505' ? 409 : 500).json({ error: insertError.code === '23505' ? 'An account with this phone number already exists. Please log in.' : 'Account creation failed. Please try again.' });
   database.users.push(user); setSession(res, user);
