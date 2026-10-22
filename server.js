@@ -147,7 +147,7 @@ function randomMiniResult(type) {
 }
 function miniSnapshot(type) {
   const g = miniGames.get(type);
-  return { type, roundId: g.roundId, phase: Date.now() < g.closesAt ? 'open' : 'revealing', closesAt: g.closesAt, revealAt: g.revealAt, serverTime: Date.now(), result: g.resultVisible ? g.result : null, history: g.history.slice(0, 15) };
+  return { type, roundId: g.roundId, phase: Date.now() < g.closesAt ? 'open' : 'revealing', closesAt: g.closesAt, revealAt: g.revealAt, serverTime: Date.now(), result: g.resultVisible ? g.result : null, history: g.history.slice(0, 500) };
 }
 function broadcastMini(type) { io.emit('mini:state', miniSnapshot(type)); }
 function startMiniRound(type) {
@@ -162,7 +162,7 @@ setInterval(() => {
   for (const type of Object.keys(MINI_CONFIG)) {
     let g = miniGames.get(type);
     if (now >= g.revealAt && !g.resultVisible) {
-      g.resultVisible = true; g.history.unshift({ roundId: g.roundId, result: g.result }); g.history = g.history.slice(0, 15);
+      g.resultVisible = true; g.history.unshift({ roundId: g.roundId, result: g.result }); g.history = g.history.slice(0, 500);
       for (const [socketId, wager] of g.wagers) {
         const player = players.get(socketId); if (!player || wager.settled) continue;
         const won = type === 'bigsmall' ? (wager.pick === 'big' ? g.result >= 5 : g.result <= 4) : wager.pick === String(g.result);
