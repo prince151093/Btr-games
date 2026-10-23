@@ -333,6 +333,7 @@ body.wallet-mode #walletView{display:block!important}
  }catch(e){wOpen('Wallet',`<p class="wallet-note" role="alert">${wEsc(e.message)}. Please sign in and try again.</p>`);}};
  document.getElementById('walletModalClose')?.addEventListener('click',wClose);walletModal?.addEventListener('click',e=>{if(e.target===walletModal)wClose()});document.addEventListener('keydown',e=>{if(e.key==='Escape')wClose()});
  document.querySelectorAll('[data-wallet-action]').forEach(btn=>btn.addEventListener('click',()=>wShow(btn.dataset.walletAction)));
+ window.__btrShowWalletAction = wShow;
  document.getElementById('walletRefresh')?.addEventListener('click',()=>wRefresh().catch(e=>alert(e.message)));
  const syncBalance=()=>{const v=document.getElementById('balance')?.textContent?.trim()||'1,000';['lobbyBalance'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=v;});};
  new MutationObserver(syncBalance).observe(document.getElementById('balance')||document.body,{childList:true,subtree:true,characterData:true}); syncBalance();
@@ -507,6 +508,23 @@ function startGameSocket(){
  $('profileForm').addEventListener('submit',async e=>{e.preventDefault();$('profileError').textContent='';try{const data=await api('/api/auth/profile',{method:'PATCH',body:JSON.stringify({username:$('profileUsername').value})});currentUser=data.user;$('profileUsername').value=currentUser.username;$('profileError').style.color='var(--green)';$('profileError').textContent='Username saved.';$('profileError').style.color='';}catch(err){$('profileError').textContent=err.message;}});
  $('logoutButton').addEventListener('click',async()=>{try{await api('/api/auth/logout',{method:'POST',body:'{}'});}catch(_){}if(socketStarted){location.reload();return;}currentUser=null;showAuth();});
  api('/api/auth/me').then(data=>{if(data.user)showApp(data.user);else showAuth();}).catch(()=>showAuth());updateAuthMode();
+})();
+</script>
+<script>
+// Robust wallet action delegation: works even if the buttons are re-rendered later.
+(()=>{
+ document.addEventListener('click',function(ev){
+  const btn=ev.target && ev.target.closest ? ev.target.closest('[data-wallet-action]') : null;
+  if(!btn) return;
+  ev.preventDefault(); ev.stopImmediatePropagation();
+  const action=btn.getAttribute('data-wallet-action');
+  if(typeof window.__btrShowWalletAction==='function'){
+   window.__btrShowWalletAction(action);
+   return;
+  }
+  const modal=document.getElementById('walletModal'),title=document.getElementById('walletModalTitle'),body=document.getElementById('walletModalBody');
+  if(modal&&title&&body){title.textContent=action==='deposit'?'Deposit coins':action==='withdraw'?'Withdraw coins':action==='vip'?'VIP levels':action==='games'?'Game history':action==='deposit-history'?'Deposit history':action==='withdraw-history'?'Withdraw history':'Transactions';body.innerHTML='<p class="wallet-note">Wallet interface could not finish loading. Please refresh the page and sign in again. If this message continues, redeploy the latest project ZIP.</p>';modal.hidden=false;}
+ },true);
 })();
 </script>
 </body>
