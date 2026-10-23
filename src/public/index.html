@@ -511,20 +511,37 @@ function startGameSocket(){
 })();
 </script>
 <script>
-// Robust wallet action delegation: works even if the buttons are re-rendered later.
+// Standalone wallet controller: open the panel immediately, then load data.
 (()=>{
- document.addEventListener('click',function(ev){
-  const btn=ev.target && ev.target.closest ? ev.target.closest('[data-wallet-action]') : null;
-  if(!btn) return;
-  ev.preventDefault(); ev.stopImmediatePropagation();
-  const action=btn.getAttribute('data-wallet-action');
-  if(typeof window.__btrShowWalletAction==='function'){
-   window.__btrShowWalletAction(action);
+ const $=id=>document.getElementById(id);
+ const modal=$('walletModal'), title=$('walletModalTitle'), body=$('walletModalBody');
+ if(!modal||!title||!body) return;
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const money=v=>Number(v||0).toLocaleString('en-IN');
+ const open=(t,html)=>{title.textContent=t;body.innerHTML=html;modal.hidden=false;};
+ const api=async(url,opts={})=>{const r=await fetch(url,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(opts.headers||{})},...opts});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||`Request failed (${r.status})`);return d;};
+ const errorBox=e=>{const el=body.querySelector('[data-wallet-error]');if(el)el.textContent=e.message||String(e);else body.insertAdjacentHTML('beforeend',`<p class="wallet-note" role="alert">${esc(e.message||e)}</p>`);};
+ async function action(a){
+  if(a==='deposit'){
+   open('Deposit coins',`<p class="wallet-note">Pay using the QR or UPI ID below. Coins are added only after admin approval.</p><img class="wallet-qr" src="/payment-qr.jpg" alt="Payment QR code"><p style="text-align:center;font-weight:900">UPI ID: <strong>Q378575515@ybl</strong> <button type="button" class="wallet-close" id="copyWalletUpi">Copy</button></p><form id="walletDepositForm"><label class="wallet-form-label">Choose amount</label><div class="wallet-quick-grid">${[50,100,200,500,1000,5000,10000].map(n=>`<button type="button" class="wallet-quick" data-wallet-amount="${n}">₹${money(n)}</button>`).join('')}</div><label class="wallet-form-label" for="walletDepositAmount">Amount / coins</label><input class="wallet-form-input" id="walletDepositAmount" type="number" min="1" max="10000000" step="1" required placeholder="Enter amount"><label class="wallet-form-label" for="walletPaymentName">Name shown on payment</label><input class="wallet-form-input" id="walletPaymentName" maxlength="100" required placeholder="Enter payer name"><label class="wallet-form-label" for="walletPaymentProof">Payment screenshot</label><input class="wallet-form-input" id="walletPaymentProof" type="file" accept="image/png,image/jpeg,image/webp" required><div class="wallet-note">PNG, JPG or WebP · Maximum 4 MB</div><div data-wallet-error class="wallet-note" role="alert"></div><button class="wallet-primary" type="submit">Submit for admin review</button></form>`);
+   body.querySelectorAll('[data-wallet-amount]').forEach(b=>b.addEventListener('click',()=>{body.querySelectorAll('[data-wallet-amount]').forEach(x=>x.classList.toggle('active',x===b));$('walletDepositAmount').value=b.dataset.walletAmount;}));
+   $('copyWalletUpi').addEventListener('click',async()=>{try{await navigator.clipboard.writeText('Q378575515@ybl');$('copyWalletUpi').textContent='Copied';}catch{$('copyWalletUpi').textContent='UPI: Q378575515@ybl';}});
+   $('walletDepositForm').addEventListener('submit',async e=>{e.preventDefault();const file=$('walletPaymentProof').files[0];if(!file)return;if(file.size>4*1024*1024){errorBox(new Error('Screenshot must be 4 MB or smaller.'));return;}const submit=body.querySelector('button[type="submit"]');submit.disabled=true;submit.textContent='Submitting…';try{const screenshot=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(new Error('Could not read screenshot.'));r.readAsDataURL(file)});await api('/api/wallet/deposits',{method:'POST',body:JSON.stringify({amount:Number($('walletDepositAmount').value),paymentName:$('walletPaymentName').value,screenshot})});open('Deposit pending',`<p>Your deposit request was submitted. Coins will be credited only after admin approval.</p><button class="wallet-primary" id="walletShowDepositHistory">View deposit history</button>`);$('walletShowDepositHistory').onclick=()=>action('deposit-history');}catch(err){errorBox(err);submit.disabled=false;submit.textContent='Submit for admin review';}});
    return;
   }
-  const modal=document.getElementById('walletModal'),title=document.getElementById('walletModalTitle'),body=document.getElementById('walletModalBody');
-  if(modal&&title&&body){title.textContent=action==='deposit'?'Deposit coins':action==='withdraw'?'Withdraw coins':action==='vip'?'VIP levels':action==='games'?'Game history':action==='deposit-history'?'Deposit history':action==='withdraw-history'?'Withdraw history':'Transactions';body.innerHTML='<p class="wallet-note">Wallet interface could not finish loading. Please refresh the page and sign in again. If this message continues, redeploy the latest project ZIP.</p>';modal.hidden=false;}
- },true);
+  if(a==='withdraw'){
+   open('Withdraw coins',`<p class="wallet-note">Minimum withdrawal: 100 coins. Your request will remain pending until an admin reviews it.</p><form id="walletWithdrawForm"><label class="wallet-form-label" for="walletWithdrawAmount">Amount (coins)</label><input class="wallet-form-input" id="walletWithdrawAmount" type="number" min="100" max="10000000" step="1" required placeholder="Minimum 100"><label class="wallet-form-label" for="walletWithdrawUpi">Your UPI ID</label><input class="wallet-form-input" id="walletWithdrawUpi" maxlength="120" required placeholder="name@bank"><div data-wallet-error class="wallet-note" role="alert"></div><button class="wallet-primary" type="submit">Submit withdrawal request</button></form>`);
+   $('walletWithdrawForm').addEventListener('submit',async e=>{e.preventDefault();const b=body.querySelector('button[type="submit"]');b.disabled=true;b.textContent='Submitting…';try{await api('/api/wallet/withdrawals',{method:'POST',body:JSON.stringify({amount:Number($('walletWithdrawAmount').value),upiId:$('walletWithdrawUpi').value.trim()})});open('Withdrawal pending','<p>Your withdrawal request was sent to the admin for review. Any payout itself must be completed separately.</p>');}catch(err){errorBox(err);b.disabled=false;b.textContent='Submit withdrawal request';}});return;
+  }
+  if(a==='vip'){
+   open('VIP levels',`<div class="wallet-list">${[['VIP 1','0–99 wins'],['VIP 2','100–999 wins'],['VIP 3','1,000–4,999 wins'],['VIP 4','5,000–19,999 wins'],['VIP 5','20,000–49,999 wins'],['VIP 6','50,000–99,999 wins'],['Super VIP','100,000–499,999 wins'],['BTR Special','500,000+ wins']].map(x=>`<div class="wallet-list-item"><strong>${x[0]}</strong><div class="wallet-note">${x[1]}</div></div>`).join('')}</div>`);try{const d=await api('/api/wallet/summary');body.insertAdjacentHTML('afterbegin',`<p class="wallet-note">Your current level: <strong>${esc(d.vip)}</strong> · Total winning coins: <strong>${money(d.totalWins)}</strong></p>`);}catch(e){errorBox(e);}return;
+  }
+  const map={'transactions':['Transaction history','/api/wallet/transactions','transactions'],'games':['Game history','/api/wallet/games','games'],'deposit-history':['Deposit history','/api/wallet/deposits','deposits'],'withdraw-history':['Withdraw history','/api/wallet/withdrawals','withdrawals']};const cfg=map[a]||map.transactions;open(cfg[0],'<p class="wallet-note">Loading…</p>');
+  try{const d=await api(cfg[1]);const rows=d[cfg[2]]||[];if(!rows.length){body.innerHTML='<p class="wallet-note">No records yet.</p>';return;}body.innerHTML='<div class="wallet-list">'+rows.map(x=>`<div class="wallet-list-item"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>${esc(x.entry_type||x.game||x.source||cfg[0])}</strong><span class="wallet-status ${esc(x.status||'')}">${esc(x.status||'recorded')}</span></div><p style="margin:7px 0">${esc(x.amount??'—')} coins ${x.payment_name?'· '+esc(x.payment_name):''} ${x.upi_id?'· '+esc(x.upi_id):''}</p><div class="wallet-note">${esc(x.created_at?new Date(x.created_at).toLocaleString():'')} ${x.game?'· '+esc(x.game):''} ${x.round_id?'· Round '+esc(x.round_id):''} ${x.admin_note?'· '+esc(x.admin_note):''}</div></div>`).join('')+'</div>';}catch(e){errorBox(e);}
+ }
+ window.__btrShowWalletAction=action;
+ $('walletModalClose')?.addEventListener('click',()=>{modal.hidden=true;});modal.addEventListener('click',e=>{if(e.target===modal)modal.hidden=true;});
+ document.addEventListener('click',e=>{const b=e.target.closest?.('[data-wallet-action]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();action(b.dataset.walletAction).catch(errorBox);},true);
 })();
 </script>
 </body>
