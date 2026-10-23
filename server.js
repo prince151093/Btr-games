@@ -13,7 +13,7 @@ const io = new Server(server);
 const PORT = Number(process.env.PORT) || 10000;
 const PUBLIC_DIR = path.join(__dirname, 'src', 'public');
 
-app.use(express.json({ limit: '20kb' }));
+app.use(express.json({ limit: '7mb' }));
 app.use(express.static(PUBLIC_DIR));
 
 // Supabase-backed account store. Keep the service-role key server-side only.
@@ -220,6 +220,75 @@ app.post('/api/admin/users/:id/adjust-balance', adminRequired, async (req, res) 
   for (const p of players.values()) if(p.userId===user.id){p.balance=user.balance;const sock=io.sockets.sockets.get(p.id);if(sock)sendPlayer(sock);}
   broadcast();
   res.json({ok:true,balance:user.balance});
+});
+
+// Wallet request workflow. Payments are manually reviewed; never credit a deposit before approval.
+const WALLET_UPI_ID = 'Q378575515@ybl';
+const DEPOSIT_AMOUNTS = new Set([50,100,200,500,1000,5000,10000]);
+function walletVip(totalWins){
+  const n=Math.max(0,Number(totalWins)||0);
+  if(n>=500000)return 'BTR Special'; if(n>=100000)return 'Super VIP'; if(n>=50000)return 'VIP 6';
+  if(n>=20000)return 'VIP 5'; if(n>=5000)return 'VIP 4'; if(n>=1000)return 'VIP 3'; if(n>=100)return 'VIP 2'; return 'VIP 1';
+}
+async function walletLedger(user, type, amount, status, details={}){
+  const {error}=await supabase.from('crashzone_wallet_ledger').insert({user_id:user.id,username:user.username,entry_type:type,amount,status,details});
+  if(error) console.error('Wallet ledger write failed:',error.message);
+}
+app.get('/api/wallet/summary',authRequired,async(req,res)=>{
+  const user=req.account;
+  const {data:ledger,error}=await supabase.from('crashzone_admin_ledger').select('entry_type,amount').eq('user_id',user.id).limit(5000);
+  const totalWins=error?0:(ledger||[]).filter(x=>['payout','win','game_win'].includes(String(x.entry_type).toLowerCase())).reduce((n,x)=>n+Number(x.amount||0),0);
+  res.json({balance:Number(user.balance)||0,totalWins,vip:walletVip(totalWins),upiId:WALLET_UPI_ID,quickAmounts:[...DEPOSIT_AMOUNTS].sort((a,b)=>a-b)});
+});
+app.post('/api/wallet/deposits',authRequired,async(req,res)=>{
+  const amount=Number(req.body?.amount),paymentName=String(req.body?.paymentName||'').trim().slice(0,100),image=String(req.body?.screenshot||'');
+  if(!Number.isSafeInteger(amount)||amount<1||amount>10000000)return res.status(400).json({error:'Enter a valid whole-number amount.'});
+  if(!paymentName)return res.status(400).json({error:'Enter the name shown on your payment.'});
+  const match=image.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if(!match)return res.status(400).json({error:'Upload a PNG, JPG or WebP payment screenshot.'});
+  const bytes=Buffer.from(match[2],'base64'); if(bytes.length>4*1024*1024)return res.status(413).json({error:'Screenshot must be 4 MB or smaller.'});
+  const id=crypto.randomUUID(), ext=match[1]==='image/png'?'png':match[1]==='image/webp'?'webp':'jpg', pathName=`deposits/${req.account.id}/${id}.${ext}`;
+  const {error:uploadError}=await supabase.storage.from('wallet-proofs').upload(pathName,bytes,{contentType:match[1],upsert:false});
+  if(uploadError)return res.status(503).json({error:'Could not store payment screenshot. Create the wallet-proofs storage bucket using wallet-schema.sql.'});
+  const {data,error}=await supabase.from('crashzone_wallet_deposits').insert({id,user_id:req.account.id,username:req.account.username,amount,payment_name:paymentName,screenshot_path:pathName,status:'pending'}).select().single();
+  if(error){await supabase.storage.from('wallet-proofs').remove([pathName]);return res.status(503).json({error:'Could not create deposit request. Apply wallet-schema.sql.'});}
+  await walletLedger(req.account,'deposit_request',amount,'pending',{requestId:id,paymentName});
+  res.status(201).json({ok:true,deposit:data,message:'Deposit submitted for manual review. Coins are added only after approval.'});
+});
+app.get('/api/wallet/deposits',authRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_wallet_deposits').select('id,amount,payment_name,status,admin_note,created_at,reviewed_at').eq('user_id',req.account.id).order('created_at',{ascending:false}).limit(200);if(error)return res.status(503).json({error:'Deposit history unavailable. Apply wallet-schema.sql.'});res.json({deposits:data||[]});});
+app.post('/api/wallet/withdrawals',authRequired,async(req,res)=>{
+  const amount=Number(req.body?.amount),upiId=String(req.body?.upiId||'').trim().slice(0,120);
+  if(!Number.isSafeInteger(amount)||amount<100||amount>10000000)return res.status(400).json({error:'Minimum withdrawal is 100 coins.'});
+  if(!/^[A-Za-z0-9._-]{2,100}@[A-Za-z0-9.-]{2,60}$/.test(upiId))return res.status(400).json({error:'Enter a valid UPI ID.'});
+  const user=database.users.find(u=>u.id===req.account.id); if(!user||user.balance<amount)return res.status(400).json({error:'Insufficient coin balance.'});
+  // Reserve coins while pending; a rejected request returns them.
+  user.balance-=amount; await saveUser(user);
+  for(const player of players.values())if(player.userId===user.id){player.balance=user.balance;const sock=io.sockets.sockets.get(player.id);if(sock)sendPlayer(sock);} broadcast();
+  const {data,error}=await supabase.from('crashzone_wallet_withdrawals').insert({user_id:user.id,username:user.username,amount,upi_id:upiId,status:'pending'}).select().single();
+  if(error){user.balance+=amount;await saveUser(user);for(const player of players.values())if(player.userId===user.id){player.balance=user.balance;const sock=io.sockets.sockets.get(player.id);if(sock)sendPlayer(sock);}broadcast();return res.status(503).json({error:'Could not create withdrawal request. Apply wallet-schema.sql.'});}
+  await walletLedger(user,'withdraw_request',amount,'pending',{requestId:data.id,upiId});
+  res.status(201).json({ok:true,withdrawal:data,balance:user.balance,message:'Withdrawal request sent to admin for review.'});
+});
+app.get('/api/wallet/withdrawals',authRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_wallet_withdrawals').select('id,amount,upi_id,status,admin_note,created_at,reviewed_at').eq('user_id',req.account.id).order('created_at',{ascending:false}).limit(200);if(error)return res.status(503).json({error:'Withdrawal history unavailable. Apply wallet-schema.sql.'});res.json({withdrawals:data||[]});});
+app.get('/api/wallet/transactions',authRequired,async(req,res)=>{const [wallet,game]=await Promise.all([supabase.from('crashzone_wallet_ledger').select('*').eq('user_id',req.account.id).order('created_at',{ascending:false}).limit(300),supabase.from('crashzone_admin_ledger').select('*').eq('user_id',req.account.id).order('created_at',{ascending:false}).limit(300)]);if(wallet.error||game.error)return res.status(503).json({error:'Transaction history unavailable.'});res.json({transactions:[...(wallet.data||[]).map(x=>({...x,source:'wallet'})),...(game.data||[]).map(x=>({...x,source:'game'}))].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))});});
+app.get('/api/wallet/games',authRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_admin_ledger').select('*').eq('user_id',req.account.id).order('created_at',{ascending:false}).limit(500);if(error)return res.status(503).json({error:'Game history unavailable.'});res.json({games:data||[]});});
+app.get('/api/admin/wallet-requests',adminRequired,async(req,res)=>{const [d,w]=await Promise.all([supabase.from('crashzone_wallet_deposits').select('*').order('created_at',{ascending:false}).limit(500),supabase.from('crashzone_wallet_withdrawals').select('*').order('created_at',{ascending:false}).limit(500)]);if(d.error||w.error)return res.status(503).json({error:'Wallet request tables unavailable. Run wallet-schema.sql.'});const deposits=await Promise.all((d.data||[]).map(async x=>{if(x.screenshot_path){const {data}=await supabase.storage.from('wallet-proofs').createSignedUrl(x.screenshot_path,600);x.screenshot_url=data?.signedUrl||null;}return x;}));res.json({deposits,withdrawals:w.data||[],pendingDeposits:deposits.filter(x=>x.status==='pending').length,pendingWithdrawals:(w.data||[]).filter(x=>x.status==='pending').length});});
+app.post('/api/admin/wallet-requests/:kind/:id/review',adminRequired,async(req,res)=>{
+  const kind=String(req.params.kind),id=String(req.params.id),decision=String(req.body?.decision||''),note=String(req.body?.note||'').trim().slice(0,500);
+  if(!['deposit','withdrawal'].includes(kind)||!['approved','rejected'].includes(decision))return res.status(400).json({error:'Invalid wallet review action.'});
+  const table=kind==='deposit'?'crashzone_wallet_deposits':'crashzone_wallet_withdrawals';
+  const {data:item,error}=await supabase.from(table).select('*').eq('id',id).maybeSingle();if(error||!item)return res.status(404).json({error:'Wallet request not found.'});if(item.status!=='pending')return res.status(409).json({error:'This request has already been reviewed.'});
+  const user=database.users.find(u=>u.id===item.user_id);if(!user)return res.status(404).json({error:'User account not found.'});
+  // Claim the request first so two admin clicks cannot credit/refund it twice.
+  const {data:claimed,error:claimError}=await supabase.from(table).update({status:'processing'}).eq('id',id).eq('status','pending').select().maybeSingle();
+  if(claimError||!claimed)return res.status(409).json({error:'This request is already being reviewed or has been reviewed. Refresh the list.'});
+  const balanceDelta=(kind==='deposit'&&decision==='approved')||(kind==='withdrawal'&&decision==='rejected')?Number(item.amount):0;
+  if(balanceDelta){user.balance+=balanceDelta;await saveUser(user);for(const player of players.values())if(player.userId===user.id){player.balance=user.balance;const sock=io.sockets.sockets.get(player.id);if(sock)sendPlayer(sock);}broadcast();}
+  const {data:updated,error:updateError}=await supabase.from(table).update({status:decision,admin_note:note||null,reviewed_at:new Date().toISOString(),reviewed_by:req.admin.username}).eq('id',id).eq('status','processing').select().maybeSingle();
+  if(updateError||!updated){if(balanceDelta){user.balance-=balanceDelta;await saveUser(user);for(const player of players.values())if(player.userId===user.id){player.balance=user.balance;const sock=io.sockets.sockets.get(player.id);if(sock)sendPlayer(sock);}broadcast();}await supabase.from(table).update({status:'pending'}).eq('id',id).eq('status','processing');return res.status(409).json({error:'Could not safely finalize this review. The request was returned to pending; refresh and retry.'});}
+  await walletLedger(user,kind==='deposit'?'deposit_review':'withdraw_review',Number(item.amount),decision,{requestId:id,note,reviewedBy:req.admin.username});
+  await auditAdmin(req,`wallet_${kind}_${decision}`,kind,id,{userId:user.id,amount:item.amount,note});
+  res.json({ok:true,request:updated,balance:user.balance});
 });
 
 // Extended admin APIs: settings, expenses, support, staff, history, audit and reports.
