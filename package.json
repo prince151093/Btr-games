@@ -1,8 +1,8 @@
 {
-  "name": "crashzone-aviator-virtual",
+  "name": "btr-games",
   "version": "2.0.0",
   "private": true,
-  "description": "Multiplayer Aviator-style crash game using virtual credits only",
+  "description": "Btr Games multiplayer crash and prediction games with wallet management",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
