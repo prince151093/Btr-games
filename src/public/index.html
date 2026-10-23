@@ -290,10 +290,12 @@ body.wallet-mode #walletView{display:block!important}
 </section>
 
 
-<div class="wallet-modal" id="walletModal" hidden role="dialog" aria-modal="true" aria-labelledby="walletModalTitle"><div class="wallet-modal-card"><div class="wallet-modal-head"><h2 id="walletModalTitle">Wallet</h2><button type="button" class="wallet-close" id="walletModalClose">Close ✕</button></div><div id="walletModalBody"></div></div></div>
+
 </main>
 <div class="disclaimer">Wallet requests are manually reviewed · Deposit approval credits coins · Withdrawal approval does not automatically send a UPI payment</div>
 </div><!-- close #gameView so the global result overlay remains visible in mini games -->
+
+<div class="wallet-modal" id="walletModal" hidden role="dialog" aria-modal="true" aria-labelledby="walletModalTitle"><div class="wallet-modal-card"><div class="wallet-modal-head"><h2 id="walletModalTitle">Wallet</h2><button type="button" class="wallet-close" id="walletModalClose">Close ✕</button></div><div id="walletModalBody"></div></div></div>
 <div id="resultOverlay" class="result-overlay" role="alertdialog" aria-live="assertive" aria-modal="true" aria-labelledby="resultTitle"><div class="result-confetti" id="resultConfetti" aria-hidden="true"></div><div class="result-card"><div id="resultKicker" class="result-kicker">✦ ROUND SETTLED</div><div id="resultIcon" class="result-icon">✓</div><div id="resultTitle" class="result-title">YOU WON!</div><div id="resultSubtitle" class="result-subtitle">Game · Round settled</div><div id="resultNet" class="result-net">+0 credits</div><div class="result-net-caption">NET RESULT</div><div class="result-breakdown"><div class="result-stat"><div class="result-stat-label">Total stake</div><div id="resultStake" class="result-stat-value">0</div></div><div class="result-stat"><div class="result-stat-label">Total payout</div><div id="resultPayout" class="result-stat-value">0</div></div></div><div class="result-progress"><span></span></div><div class="result-footer">THIS RESULT WILL CLOSE AUTOMATICALLY</div></div></div><div id="toast" class="toast"></div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
