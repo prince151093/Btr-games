@@ -239,13 +239,34 @@ app.get('/api/wallet/summary',authRequired,async(req,res)=>{
   const {data:ledger,error}=await supabase.from('crashzone_admin_ledger').select('entry_type,amount,created_at').eq('user_id',user.id).order('created_at',{ascending:true}).limit(10000);
   const wins=(ledger||[]).filter(x=>['payout','win','game_win'].includes(String(x.entry_type).toLowerCase()));
   const totalWins=error?0:wins.reduce((n,x)=>n+Number(x.amount||0),0);
-  // One-time VIP 3 milestone bonus: 5% of 3,000 = 150 coins. Only award if the historical win ledger shows the user crossed 1,000.
-  if(!error && wins.length){let cumulative=0, crossed=false; for(const row of wins){cumulative+=Number(row.amount||0);if(cumulative>=1000){crossed=true;break;}}
-    if(crossed){const {data:prior,error:priorError}=await supabase.from('crashzone_wallet_ledger').select('id').eq('user_id',user.id).eq('entry_type','vip3_level_up_bonus').limit(1);
-      if(!priorError && !(prior||[]).length){user.balance=(Number(user.balance)||0)+150;await saveUser(user);await walletLedger(user,'vip3_level_up_bonus',150,'approved',{level:'VIP 3',bonusRate:0.05,baseCoins:3000});for(const player of players.values())if(player.userId===user.id){player.balance=user.balance;const sock=io.sockets.sockets.get(player.id);if(sock)sendPlayer(sock);}broadcast();}
+  // Award a one-time 5% milestone bonus for every VIP level reached.
+  // Bonus bases follow the displayed level targets; the first level has no level-up reward.
+  const milestones=[
+    {level:'VIP 2',threshold:100,base:100,key:'vip2_level_up_bonus'},
+    {level:'VIP 3',threshold:1000,base:3000,key:'vip3_level_up_bonus'},
+    {level:'VIP 4',threshold:3001,base:20000,key:'vip4_level_up_bonus'},
+    {level:'VIP 5',threshold:20000,base:50000,key:'vip5_level_up_bonus'},
+    {level:'VIP 6',threshold:50000,base:100000,key:'vip6_level_up_bonus'},
+    {level:'Super VIP',threshold:100000,base:500000,key:'super_vip_level_up_bonus'},
+    {level:'BTR Special',threshold:500000,base:500000,key:'btr_special_level_up_bonus'}
+  ];
+  if(!error && totalWins>=100){
+    const {data:existingBonuses,error:bonusReadError}=await supabase.from('crashzone_wallet_ledger').select('entry_type').eq('user_id',user.id).in('entry_type',milestones.map(m=>m.key));
+    if(!bonusReadError){
+      const already=new Set((existingBonuses||[]).map(x=>x.entry_type));
+      for(const milestone of milestones){
+        if(totalWins<milestone.threshold||already.has(milestone.key))continue;
+        const bonus=Math.round(milestone.base*0.05);
+        user.balance=(Number(user.balance)||0)+bonus;
+        await saveUser(user);
+        await walletLedger(user,milestone.key,bonus,'approved',{level:milestone.level,bonusRate:0.05,baseCoins:milestone.base});
+        already.add(milestone.key);
+      }
+      for(const player of players.values())if(player.userId===user.id){player.balance=user.balance;const sock=io.sockets.sockets.get(player.id);if(sock)sendPlayer(sock);}
+      broadcast();
     }
   }
-  res.json({balance:Number(user.balance)||0,totalWins,vip:walletVip(totalWins),upiId:WALLET_UPI_ID,quickAmounts:[...DEPOSIT_AMOUNTS].sort((a,b)=>a-b),vip3Bonus:150});
+  res.json({balance:Number(user.balance)||0,totalWins,vip:walletVip(totalWins),upiId:WALLET_UPI_ID,quickAmounts:[...DEPOSIT_AMOUNTS].sort((a,b)=>a-b),vipBonusRate:0.05});
 });
 app.post('/api/wallet/deposits',authRequired,async(req,res)=>{
   const amount=Number(req.body?.amount),paymentName=String(req.body?.paymentName||'').trim().slice(0,100),image=String(req.body?.screenshot||'');
