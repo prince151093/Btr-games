@@ -13,7 +13,7 @@ const io = new Server(server);
 const PORT = Number(process.env.PORT) || 10000;
 const PUBLIC_DIR = path.join(__dirname, 'src', 'public');
 
-app.use(express.json({ limit: '6mb' }));
+app.use(express.json({ limit: '20kb' }));
 app.use(express.static(PUBLIC_DIR));
 
 // Supabase-backed account store. Keep the service-role key server-side only.
@@ -159,51 +159,6 @@ app.patch('/api/auth/profile', authRequired, async (req, res) => {
   req.account.username = username;
   for (const [socketId, player] of players) if (player.userId === req.account.id) { player.name = username; const sock = io.sockets.sockets.get(socketId); if (sock) sendPlayer(sock); }
   broadcast(); res.json({ user: publicAccount(req.account) });
-});
-
-// Wallet requests: all payment proof is manually reviewed by the configured owner.
-const WALLET_UPI_ID = 'Q378575515@ybl';
-const walletTable = 'btr_wallet_requests';
-app.get('/api/wallet', authRequired, async (req,res) => {
-  const {data: requests,error}=await supabase.from(walletTable).select('id,user_id,kind,amount,payment_name,upi_id,proof_data,status,admin_note,created_at,reviewed_at').eq('user_id',req.account.id).order('created_at',{ascending:false}).limit(500);
-  if(error)return res.status(503).json({error:'Wallet storage is not ready. Run wallet-schema.sql in Supabase SQL Editor.'});
-  const {data: ledger}=await supabase.from('crashzone_admin_ledger').select('entry_type,amount,created_at,game,round_id,details').eq('user_id',req.account.id).order('created_at',{ascending:false}).limit(500);
-  const roundTotals={};for(const x of (ledger||[])){if(!['aviator','bigsmall','color','lucky'].includes(x.game))continue;const key=String(x.game)+':'+String(x.round_id||'');const r=roundTotals[key]||(roundTotals[key]={stake:0,payout:0});if(x.entry_type==='stake')r.stake+=Number(x.amount)||0;if(x.entry_type==='payout')r.payout+=Number(x.amount)||0;}const wins=Object.values(roundTotals).reduce((n,r)=>n+Math.max(0,r.payout-r.stake),0);
-  const level=wins>=500000?'BTR Special':wins>=100000?'Super VIP':wins>=50000?'VIP 6':wins>=20000?'VIP 5':wins>=5000?'VIP 4':wins>=1000?'VIP 3':wins>=100?'VIP 2':'VIP 1';
-  res.json({upiId:WALLET_UPI_ID,balance:req.account.balance,requests:requests||[],ledger:ledger||[],totalWins:wins,vip:level});
-});
-app.post('/api/wallet/deposit', authRequired, async(req,res)=>{
-  const amount=Number(req.body?.amount), paymentName=String(req.body?.paymentName||'').trim().slice(0,100), proof=String(req.body?.proofData||'');
-  if(!Number.isSafeInteger(amount)||![50,100,200,500,1000,5000,10000].includes(amount) && (amount<1||amount>100000))return res.status(400).json({error:'Choose a preset or enter a whole amount from 1 to 100000.'});
-  if(paymentName.length<2)return res.status(400).json({error:'Enter the payment name / payer name.'});
-  if(!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(proof)||proof.length>5*1024*1024)return res.status(400).json({error:'Upload a valid payment screenshot under 3.5 MB.'});
-  const {data,error}=await supabase.from(walletTable).insert({user_id:req.account.id,username:req.account.username,kind:'deposit',amount,payment_name:paymentName,upi_id:WALLET_UPI_ID,proof_data:proof,status:'pending'}).select('id,kind,amount,payment_name,upi_id,status,created_at').single();
-  if(error)return res.status(503).json({error:'Could not submit deposit. Run wallet-schema.sql in Supabase SQL Editor.'});
-  res.status(201).json({ok:true,request:data,message:'Deposit proof submitted. Coins are added only after admin verification.'});
-});
-app.post('/api/wallet/withdraw', authRequired, async(req,res)=>{
-  const amount=Number(req.body?.amount), upi=String(req.body?.upiId||'').trim().slice(0,100);
-  if(!Number.isSafeInteger(amount)||amount<100||amount>100000000)return res.status(400).json({error:'Minimum withdrawal is 100 coins; enter a whole number.'});
-  if(!/^[A-Za-z0-9._-]{2,100}@[A-Za-z0-9.-]{2,60}$/.test(upi))return res.status(400).json({error:'Enter a valid UPI ID.'});
-  if(req.account.balance<amount)return res.status(400).json({error:'Insufficient available coins.'});
-  // Reserve coins while the request is pending so they cannot be spent twice.
-  req.account.balance-=amount; await saveUser(req.account);
-  const {data,error}=await supabase.from(walletTable).insert({user_id:req.account.id,username:req.account.username,kind:'withdraw',amount,payment_name:null,upi_id:upi,proof_data:null,status:'pending'}).select('id,kind,amount,upi_id,status,created_at').single();
-  if(error){req.account.balance+=amount;await saveUser(req.account);return res.status(503).json({error:'Could not submit withdrawal. Run wallet-schema.sql in Supabase SQL Editor.'});}
-  for(const p of players.values())if(p.userId===req.account.id){p.balance=req.account.balance;const sock=io.sockets.sockets.get(p.id);if(sock)sendPlayer(sock);}
-  res.status(201).json({ok:true,request:data,balance:req.account.balance,message:'Withdrawal is pending admin review. Coins are reserved until it is approved or rejected.'});
-});
-app.get('/api/admin/wallet-requests',adminRequired,async(req,res)=>{
- const kind=String(req.query.kind||'all');let q=supabase.from(walletTable).select('*').order('created_at',{ascending:false}).limit(1000);if(['deposit','withdraw'].includes(kind))q=q.eq('kind',kind);const {data,error}=await q;if(error)return res.status(503).json({error:'Wallet storage is not ready. Run wallet-schema.sql in Supabase SQL Editor.'});res.json({requests:data||[],pending:(data||[]).filter(x=>x.status==='pending').length});
-});
-app.post('/api/admin/wallet-requests/:id/review',adminRequired,async(req,res)=>{
- const status=String(req.body?.status||''),note=String(req.body?.note||'').trim().slice(0,300);if(!['approved','rejected'].includes(status))return res.status(400).json({error:'Choose approve or reject.'});
- const {data:result,error}=await supabase.rpc('btr_review_wallet_request',{p_request_id:req.params.id,p_status:status,p_note:note,p_reviewed_by:req.admin.username});
- if(error){const msg=String(error.message||'');return res.status(msg.includes('already reviewed')?409:msg.includes('not found')?404:503).json({error:msg.includes('already reviewed')?'This request has already been reviewed.':msg.includes('not found')?'Wallet request or user not found.':'Wallet review failed. Run admin/wallet-schema.sql in Supabase SQL Editor and retry.'});}
- const item=result.request,user=database.users.find(u=>u.id===item.user_id);if(user){user.balance=Number(result.balance);await saveUser(user);for(const p of players.values())if(p.userId===user.id){p.balance=user.balance;const sock=io.sockets.sockets.get(p.id);if(sock)sendPlayer(sock);}}
- if(item.kind==='deposit'&&status==='approved')writeLedger({game:'wallet',roundId:item.id,userId:item.user_id,username:item.username,entryType:'deposit',amount:item.amount,details:{requestId:item.id,admin:req.admin.username}});
- if(item.kind==='withdraw'&&status==='approved')writeLedger({game:'wallet',roundId:item.id,userId:item.user_id,username:item.username,entryType:'withdrawal',amount:item.amount,details:{requestId:item.id,upiId:item.upi_id,admin:req.admin.username}});
- await auditAdmin(req,'wallet_request_'+status,'wallet_request',item.id,{kind:item.kind,amount:item.amount,userId:item.user_id,note});broadcast();res.json({ok:true,status,balance:user?.balance??Number(result.balance)});
 });
 
 // Admin login and reporting API
