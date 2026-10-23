@@ -228,7 +228,7 @@ const DEPOSIT_AMOUNTS = new Set([50,100,200,500,1000,5000,10000]);
 function walletVip(totalWins){
   const n=Math.max(0,Number(totalWins)||0);
   if(n>=500000)return 'BTR Special'; if(n>=100000)return 'Super VIP'; if(n>=50000)return 'VIP 6';
-  if(n>=20000)return 'VIP 5'; if(n>=5000)return 'VIP 4'; if(n>=1000)return 'VIP 3'; if(n>=100)return 'VIP 2'; return 'VIP 1';
+  if(n>=20000)return 'VIP 5'; if(n>=3001)return 'VIP 4'; if(n>=1000)return 'VIP 3'; if(n>=100)return 'VIP 2'; return 'VIP 1';
 }
 async function walletLedger(user, type, amount, status, details={}){
   const {error}=await supabase.from('crashzone_wallet_ledger').insert({user_id:user.id,username:user.username,entry_type:type,amount,status,details});
@@ -236,9 +236,16 @@ async function walletLedger(user, type, amount, status, details={}){
 }
 app.get('/api/wallet/summary',authRequired,async(req,res)=>{
   const user=req.account;
-  const {data:ledger,error}=await supabase.from('crashzone_admin_ledger').select('entry_type,amount').eq('user_id',user.id).limit(5000);
-  const totalWins=error?0:(ledger||[]).filter(x=>['payout','win','game_win'].includes(String(x.entry_type).toLowerCase())).reduce((n,x)=>n+Number(x.amount||0),0);
-  res.json({balance:Number(user.balance)||0,totalWins,vip:walletVip(totalWins),upiId:WALLET_UPI_ID,quickAmounts:[...DEPOSIT_AMOUNTS].sort((a,b)=>a-b)});
+  const {data:ledger,error}=await supabase.from('crashzone_admin_ledger').select('entry_type,amount,created_at').eq('user_id',user.id).order('created_at',{ascending:true}).limit(10000);
+  const wins=(ledger||[]).filter(x=>['payout','win','game_win'].includes(String(x.entry_type).toLowerCase()));
+  const totalWins=error?0:wins.reduce((n,x)=>n+Number(x.amount||0),0);
+  // One-time VIP 3 milestone bonus: 5% of 3,000 = 150 coins. Only award if the historical win ledger shows the user crossed 1,000.
+  if(!error && wins.length){let cumulative=0, crossed=false; for(const row of wins){cumulative+=Number(row.amount||0);if(cumulative>=1000){crossed=true;break;}}
+    if(crossed){const {data:prior,error:priorError}=await supabase.from('crashzone_wallet_ledger').select('id').eq('user_id',user.id).eq('entry_type','vip3_level_up_bonus').limit(1);
+      if(!priorError && !(prior||[]).length){user.balance=(Number(user.balance)||0)+150;await saveUser(user);await walletLedger(user,'vip3_level_up_bonus',150,'approved',{level:'VIP 3',bonusRate:0.05,baseCoins:3000});for(const player of players.values())if(player.userId===user.id){player.balance=user.balance;const sock=io.sockets.sockets.get(player.id);if(sock)sendPlayer(sock);}broadcast();}
+    }
+  }
+  res.json({balance:Number(user.balance)||0,totalWins,vip:walletVip(totalWins),upiId:WALLET_UPI_ID,quickAmounts:[...DEPOSIT_AMOUNTS].sort((a,b)=>a-b),vip3Bonus:150});
 });
 app.post('/api/wallet/deposits',authRequired,async(req,res)=>{
   const amount=Number(req.body?.amount),paymentName=String(req.body?.paymentName||'').trim().slice(0,100),image=String(req.body?.screenshot||'');
@@ -258,7 +265,7 @@ app.post('/api/wallet/deposits',authRequired,async(req,res)=>{
 app.get('/api/wallet/deposits',authRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_wallet_deposits').select('id,amount,payment_name,status,admin_note,created_at,reviewed_at').eq('user_id',req.account.id).order('created_at',{ascending:false}).limit(200);if(error)return res.status(503).json({error:'Deposit history unavailable. Apply wallet-schema.sql.'});res.json({deposits:data||[]});});
 app.post('/api/wallet/withdrawals',authRequired,async(req,res)=>{
   const amount=Number(req.body?.amount),upiId=String(req.body?.upiId||'').trim().slice(0,120);
-  if(!Number.isSafeInteger(amount)||amount<100||amount>10000000)return res.status(400).json({error:'Minimum withdrawal is 100 coins.'});
+  if(!Number.isSafeInteger(amount)||amount<300||amount>10000000)return res.status(400).json({error:'Minimum withdrawal is 300 coins.'});
   if(!/^[A-Za-z0-9._-]{2,100}@[A-Za-z0-9.-]{2,60}$/.test(upiId))return res.status(400).json({error:'Enter a valid UPI ID.'});
   const user=database.users.find(u=>u.id===req.account.id); if(!user||user.balance<amount)return res.status(400).json({error:'Insufficient coin balance.'});
   // Reserve coins while pending; a rejected request returns them.
@@ -358,7 +365,7 @@ const WAIT_MS = 30000; // fallback; admin-configured duration is used by waitMs(
 function waitMs(){ return gameDurationMs('aviator'); }
 const TICK_MS = 100;
 const MAX_BET = 1000;
-const STARTING_CREDITS = 1000;
+const STARTING_CREDITS = 0;
 const players = new Map();
 const bets = new Map();
 const miniGames = new Map();
