@@ -500,9 +500,8 @@ function minesMultiplier(mines, safePicks) {
   return Math.floor(value * 100) / 100;
 }
 function minesPublic(game, reveal = false) {
-  const visibleMultiplier = game.status === 'active' ? 1 : minesMultiplier(game.mineCount, game.picked.length);
-  return { id: game.id, stake: game.stake, mineCount: game.mineCount, picked: [...game.picked], multiplier: visibleMultiplier,
-    potentialPayout: game.status === 'active' ? game.stake : Math.floor(game.stake * visibleMultiplier), status: game.status,
+  return { id: game.id, stake: game.stake, mineCount: game.mineCount, picked: [...game.picked], multiplier: minesMultiplier(game.mineCount, game.picked.length),
+    potentialPayout: Math.floor(game.stake * minesMultiplier(game.mineCount, game.picked.length)), status: game.status,
     mines: reveal ? [...game.mines] : undefined, balance: game.balance };
 }
 function syncMinesBalance(user) {
@@ -520,82 +519,34 @@ app.post('/api/mines/start', authRequired, async (req, res) => {
   if (!Number.isSafeInteger(stake) || stake < 1 || stake > 1000) return res.status(400).json({ error: 'Bet amount must be 1–1,000 coins.' });
   if (!Number.isInteger(mineCount) || mineCount < 1 || mineCount > 24) return res.status(400).json({ error: 'Choose 1–24 mines.' });
   if (stake > req.account.balance) return res.status(400).json({ error: 'Not enough coins.' });
-  // Explicit fixed-odds mode: the published tier is drawn server-side before play.
-  // Categories are mutually exclusive and sum to 100%; a round resolves on its first reveal.
-  const roll = crypto.randomInt(0, 100);
-  let outcomeTier, targetMultiplier;
-  if (roll < 45) { outcomeTier = 'loss'; targetMultiplier = 0; }
-  else if (roll < 75) { outcomeTier = 'low'; targetMultiplier = Math.round((1 + crypto.randomInt(0, 100) / 100) * 100) / 100; }
-  else if (roll < 90) { outcomeTier = 'medium'; targetMultiplier = Math.round((2 + crypto.randomInt(0, 201) / 100) * 100) / 100; }
-  else { outcomeTier = 'high'; targetMultiplier = Math.round((4.01 + crypto.randomInt(0, 600) / 100) * 100) / 100; }
+  const positions = new Set(); while (positions.size < mineCount) positions.add(crypto.randomInt(0, 25));
   minesGames.set(req.account.id, { status: 'starting' });
   req.account.balance -= stake; await saveUser(req.account);
-  const game = { id: crypto.randomUUID(), roundId: Date.now().toString(36), userId: req.account.id, username: req.account.username, stake, mineCount, mines: [], picked: [], status: 'active', startedAt: new Date().toISOString(), balance: req.account.balance, outcomeTier, targetMultiplier };
+  const game = { id: crypto.randomUUID(), roundId: Date.now().toString(36), userId: req.account.id, username: req.account.username, stake, mineCount, mines: [...positions], picked: [], status: 'active', startedAt: new Date().toISOString(), balance: req.account.balance };
   minesGames.set(req.account.id, game);
-  writeLedger({ game: 'mines', roundId: game.roundId, userId: game.userId, username: game.username, entryType: 'stake', amount: stake, details: { mineCount, probabilityMode: true } });
+  writeLedger({ game: 'mines', roundId: game.roundId, userId: game.userId, username: game.username, entryType: 'stake', amount: stake, details: { mineCount } });
   syncMinesBalance(req.account); res.status(201).json({ game: minesPublic(game), balance: req.account.balance });
 });
-app.post('/api/mines/pick', authRequired, async (req, res) => {
+app.post('/api/mines/pick', authRequired, (req, res) => {
   const game = minesGames.get(req.account.id); if (!game || game.status !== 'active') return res.status(409).json({ error: 'Start a new round first.' });
   const tile = Number(req.body?.tile); if (!Number.isInteger(tile) || tile < 0 || tile > 24) return res.status(400).json({ error: 'Choose a valid tile.' });
-  if (game.picked.length) return res.status(409).json({ error: 'This fixed-odds round has already resolved.' });
-  game.picked.push(tile);
-  const history = minesHistory.get(game.userId) || [];
-  if (game.outcomeTier === 'loss') {
-    game.mines = [tile]; game.status = 'lost'; game.balance = req.account.balance;
-    writeLedger({ game: 'mines', roundId: game.roundId, userId: game.userId, username: game.username, entryType: 'loss', amount: 0, details: { stake: game.stake, mineCount: game.mineCount, tile, outcomeTier: 'loss', probabilityMode: true } });
-    history.unshift({ roundId: game.roundId, stake: game.stake, payout: 0, net: -game.stake, mines: game.mineCount, outcome: 'Lost · 45%', date: new Date().toISOString() }); minesHistory.set(game.userId, history.slice(0, 50));
-    return res.json({ hitMine: true, game: minesPublic(game, true), balance: req.account.balance, history: history.slice(0, 20), outcomeTier: 'loss' });
+  if (game.picked.includes(tile)) return res.status(409).json({ error: 'That tile is already revealed.' });
+  if (game.mines.includes(tile)) {
+    game.status = 'lost'; game.balance = req.account.balance;
+    writeLedger({ game: 'mines', roundId: game.roundId, userId: game.userId, username: game.username, entryType: 'loss', amount: 0, details: { stake: game.stake, mineCount: game.mineCount, tile } });
+    const history = minesHistory.get(game.userId) || []; history.unshift({ roundId: game.roundId, stake: game.stake, payout: 0, net: -game.stake, mines: game.mineCount, outcome: 'Lost', date: new Date().toISOString() }); minesHistory.set(game.userId, history.slice(0, 50));
+    return res.json({ hitMine: true, game: minesPublic(game, true), balance: req.account.balance, history: history.slice(0, 20) });
   }
-  game.mines = []; game.status = 'cashed_out';
-  const payout = Math.floor(game.stake * game.targetMultiplier);
-  req.account.balance += payout; game.balance = req.account.balance; await saveUser(req.account); syncMinesBalance(req.account);
-  writeLedger({ game: 'mines', roundId: game.roundId, userId: game.userId, username: game.username, entryType: 'payout', amount: payout, details: { stake: game.stake, mineCount: game.mineCount, safePicks: 1, multiplier: game.targetMultiplier, outcomeTier: game.outcomeTier, probabilityMode: true } });
-  history.unshift({ roundId: game.roundId, stake: game.stake, payout, net: payout - game.stake, mines: game.mineCount, outcome: `Won · ${game.targetMultiplier.toFixed(2)}×`, date: new Date().toISOString() }); minesHistory.set(game.userId, history.slice(0, 50));
-  res.json({ hitMine: false, game: { ...minesPublic(game, true), multiplier: game.targetMultiplier, potentialPayout: payout }, payout, multiplier: game.targetMultiplier, balance: req.account.balance, history: history.slice(0, 20), outcomeTier: game.outcomeTier, settled: true });
+  game.picked.push(tile); return res.json({ hitMine: false, game: minesPublic(game), balance: req.account.balance });
 });
-app.post('/api/mines/cashout', authRequired, (req, res) => res.status(400).json({ error: 'Fixed-odds Mines resolves automatically on the first tile reveal.' }));
-
-// Tower Climb and Plinko: single-round, server-settled virtual coin games.
-const arcadeBusy = new Set();
-app.post('/api/arcade/play', authRequired, async (req, res) => {
-  const user = req.account;
-  if (arcadeBusy.has(user.id)) return res.status(409).json({ error: 'A game is already being settled. Try again shortly.' });
-  const game = String(req.body?.game || ''), stake = Number(req.body?.amount);
-  if (!['tower','plinko'].includes(game)) return res.status(400).json({ error: 'Unknown game.' });
-  if (!Number.isSafeInteger(stake) || stake < 1 || stake > 1000) return res.status(400).json({ error: 'Bet amount must be 1–1,000 coins.' });
-  if (stake > user.balance) return res.status(400).json({ error: 'Not enough coins.' });
-  let multiplier, won, detail;
-  if (game === 'tower') {
-    const floors = Number(req.body?.floors);
-    if (!Number.isInteger(floors) || floors < 1 || floors > 5) return res.status(400).json({ error: 'Choose 1–5 floors.' });
-    const chance = Math.pow(0.72, floors);
-    won = crypto.randomInt(0, 1000000) < Math.floor(chance * 1000000);
-    multiplier = won ? Math.floor((0.96 / chance) * 100) / 100 : 0;
-    detail = { floors, winChance: Math.round(chance * 10000) / 100 };
-  } else {
-    const rows = Number(req.body?.rows), risk = String(req.body?.risk || 'medium');
-    if (![8, 12, 16].includes(rows) || !['low','medium','high'].includes(risk)) return res.status(400).json({ error: 'Choose 8, 12, or 16 rows and a valid risk.' });
-    const slots = rows + 1, slot = crypto.randomInt(0, slots), distance = Math.abs(slot - rows / 2) / (rows / 2);
-    const max = risk === 'low' ? 2.2 : risk === 'medium' ? 5 : 12;
-    multiplier = Math.max(0, Math.round((0.15 + Math.pow(distance, 2.3) * (max - 0.15)) * 100) / 100);
-    won = multiplier >= 1; detail = { rows, risk, slot, slots };
-  }
-  const payout = won ? Math.floor(stake * multiplier) : 0;
-  arcadeBusy.add(user.id);
-  try {
-    user.balance -= stake;
-    if (payout > 0) user.balance += payout;
-    await saveUser(user);
-    const roundId = `${game}-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
-    writeLedger({ game, roundId, userId: user.id, username: user.username, entryType: 'stake', amount: stake, details: detail });
-    writeLedger({ game, roundId, userId: user.id, username: user.username, entryType: payout > 0 ? 'payout' : 'loss', amount: payout, details: { ...detail, stake, payout, multiplier: won ? multiplier : 0 } });
-    syncMinesBalance(user);
-    res.json({ game, roundId, stake, won, multiplier: won ? multiplier : 0, payout, net: payout - stake, balance: user.balance, details: detail });
-  } catch (e) {
-    console.error(`${game} settlement error:`, e.message);
-    res.status(500).json({ error: 'Could not settle this round. Please check your balance before retrying.' });
-  } finally { arcadeBusy.delete(user.id); }
+app.post('/api/mines/cashout', authRequired, async (req, res) => {
+  const game = minesGames.get(req.account.id); if (!game || game.status !== 'active') return res.status(409).json({ error: 'There is no active round to cash out.' });
+  if (!game.picked.length) return res.status(400).json({ error: 'Reveal at least one safe tile before cashing out.' });
+  const multiplier = minesMultiplier(game.mineCount, game.picked.length), payout = Math.floor(game.stake * multiplier);
+  game.status = 'cashed_out'; req.account.balance += payout; game.balance = req.account.balance; await saveUser(req.account); syncMinesBalance(req.account);
+  writeLedger({ game: 'mines', roundId: game.roundId, userId: game.userId, username: game.username, entryType: 'payout', amount: payout, details: { stake: game.stake, mineCount: game.mineCount, safePicks: game.picked.length, multiplier } });
+  const history = minesHistory.get(game.userId) || []; history.unshift({ roundId: game.roundId, stake: game.stake, payout, net: payout - game.stake, mines: game.mineCount, outcome: 'Cashed out', date: new Date().toISOString() }); minesHistory.set(game.userId, history.slice(0, 50));
+  res.json({ game: minesPublic(game, true), payout, multiplier, balance: req.account.balance, history: history.slice(0, 20) });
 });
 function snapshot() {
   return {
