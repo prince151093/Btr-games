@@ -116,33 +116,79 @@ app.get('/api/auth/me', (req, res) => {
   const user = sessionUser(req);
   res.json({ user: user ? publicAccount(user) : null });
 });
-app.post('/api/auth/signup', async (req, res) => {
-  const phone = String(req.body?.phone || '').replace(/[\s()-]/g, '');
-  const password = String(req.body?.password || '');
-  const requestedUsername = String(req.body?.username || '').trim();
-  if (!/^\+?[0-9]{10,15}$/.test(phone)) return res.status(400).json({ error: 'Enter a valid phone number (10–15 digits).' });
-  if (password.length < 8 || password.length > 128) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
-  if (database.users.some(u => u.phone === phone)) return res.status(409).json({ error: 'An account with this phone number already exists. Please log in.' });
-  const { data: userNumber, error: numberError } = await supabase.rpc('crashzone_next_user_number');
-  if (numberError) return res.status(500).json({ error: 'Could not allocate an account number. Check the Supabase SQL setup.' });
-  const username = requestedUsername || `user${userNumber}`;
-  if (!/^[A-Za-z0-9_]{3,18}$/.test(username)) return res.status(400).json({ error: 'Username must be 3–18 characters: letters, numbers, or underscores.' });
-  if (database.users.some(u => u.username.toLowerCase() === username.toLowerCase())) return res.status(409).json({ error: 'That username is already taken. Choose another.' });
-  const credentials = hashPassword(password);
-  const user = { id: crypto.randomUUID(), userNumber: Number(userNumber), uid: String(1000000000 + Number(userNumber)), phone, username, balance: STARTING_CREDITS, passwordSalt: credentials.salt, passwordHash: credentials.hash, createdAt: new Date().toISOString() };
-  const { error: insertError } = await supabase.from('crashzone_users').insert(dbUser(user));
-  if (insertError) return res.status(insertError.code === '23505' ? 409 : 500).json({ error: insertError.code === '23505' ? 'An account with this phone number already exists. Please log in.' : 'Account creation failed. Please try again.' });
-  database.users.push(user); setSession(res, user);
-  res.status(201).json({ user: publicAccount(user) });
+// SMS OTP authentication uses Twilio Verify. Configure all three TWILIO_* variables.
+const otpAttempts = new Map();
+const otpChallenges = new Map();
+function normalizePhone(value) { return String(value || '').replace(/[\s()-]/g, ''); }
+function otpConfigReady() { return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_VERIFY_SERVICE_SID); }
+async function twilioVerify(pathname, params) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const service = process.env.TWILIO_VERIFY_SERVICE_SID;
+  const response = await fetch(`https://verify.twilio.com/v2/Services/${service}/${pathname}`, {
+    method: 'POST', headers: { 'Authorization': 'Basic ' + Buffer.from(`${sid}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(params)
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error('Twilio Verify request failed:', response.status, body.code || 'unknown');
+    const err = new Error(response.status === 429 ? 'Too many OTP requests. Please wait before trying again.' : 'Could not send or verify the OTP. Check the phone number and try again.');
+    err.status = response.status === 429 ? 429 : 502; throw err;
+  }
+  return body;
+}
+app.post('/api/auth/otp/start', async (req, res) => {
+  try {
+    if (!otpConfigReady()) return res.status(503).json({ error: 'SMS OTP is not configured. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_VERIFY_SERVICE_SID to the server environment.' });
+    const phone = normalizePhone(req.body?.phone);
+    const mode = req.body?.mode === 'signup' ? 'signup' : 'login';
+    const username = String(req.body?.username || '').trim();
+    if (!/^\+[1-9][0-9]{7,14}$/.test(phone)) return res.status(400).json({ error: 'Enter your phone number in international format, including country code (for example +919876543210).' });
+    const now = Date.now();
+    const recent = otpAttempts.get(phone) || [];
+    const fresh = recent.filter(t => now - t < 60 * 60 * 1000);
+    if (fresh.length >= 5) return res.status(429).json({ error: 'Too many OTP requests for this number. Try again in an hour.' });
+    const last = fresh[fresh.length - 1];
+    if (last && now - last < 30 * 1000) return res.status(429).json({ error: 'Please wait 30 seconds before requesting another OTP.' });
+    let existing = database.users.find(u => u.phone === phone);
+    if (!existing) { const { data } = await supabase.from('crashzone_users').select('*').eq('phone', phone).maybeSingle(); if (data) { existing = mapUser(data); database.users.push(existing); } }
+    if (mode === 'signup' && existing) return res.status(409).json({ error: 'An account with this phone number already exists. Please log in.' });
+    if (mode === 'login' && !existing) return res.status(404).json({ error: 'No account found for this phone number. Create an account first.' });
+    if (mode === 'signup' && !/^[A-Za-z0-9_]{3,18}$/.test(username)) return res.status(400).json({ error: 'Username must be 3–18 characters: letters, numbers, or underscores.' });
+    if (mode === 'signup' && database.users.some(u => u.username.toLowerCase() === username.toLowerCase())) return res.status(409).json({ error: 'That username is already taken. Choose another.' });
+    await twilioVerify('Verifications', { To: phone, Channel: 'sms' });
+    fresh.push(now); otpAttempts.set(phone, fresh);
+    otpChallenges.set(phone, { mode, username, createdAt: now });
+    res.json({ ok: true, message: 'Verification code sent by SMS.' });
+  } catch (err) { res.status(err.status || 500).json({ error: err.status ? err.message : 'Could not start verification. Please try again.' }); }
 });
-app.post('/api/auth/login', async (req, res) => {
-  const phone = String(req.body?.phone || '').replace(/[\s()-]/g, '');
-  const password = String(req.body?.password || '');
-  let user = database.users.find(u => u.phone === phone);
-  if (!user) { const { data } = await supabase.from('crashzone_users').select('*').eq('phone', phone).maybeSingle(); if (data) { user = mapUser(data); database.users.push(user); } }
-  if (!user || !passwordMatches(password, user)) return res.status(401).json({ error: 'Incorrect phone number or password.' });
-  if (suspendedUsers.has(user.id)) return res.status(403).json({ error: 'This account is suspended. Contact support.' });
-  setSession(res, user); res.json({ user: publicAccount(user) });
+app.post('/api/auth/otp/verify', async (req, res) => {
+  try {
+    if (!otpConfigReady()) return res.status(503).json({ error: 'SMS OTP is not configured on the server.' });
+    const phone = normalizePhone(req.body?.phone);
+    const code = String(req.body?.code || '').trim();
+    const challenge = otpChallenges.get(phone);
+    if (!/^\+[1-9][0-9]{7,14}$/.test(phone) || !/^\d{4,10}$/.test(code)) return res.status(400).json({ error: 'Enter a valid phone number and verification code.' });
+    if (!challenge || Date.now() - challenge.createdAt > 10 * 60 * 1000) { otpChallenges.delete(phone); return res.status(400).json({ error: 'Your OTP session expired. Request a new code.' }); }
+    const result = await twilioVerify('VerificationCheck', { To: phone, Code: code });
+    if (result.status !== 'approved') return res.status(401).json({ error: 'Incorrect verification code. Please try again.' });
+    otpChallenges.delete(phone);
+    let user = database.users.find(u => u.phone === phone);
+    if (!user) { const { data } = await supabase.from('crashzone_users').select('*').eq('phone', phone).maybeSingle(); if (data) { user = mapUser(data); database.users.push(user); } }
+    if (challenge.mode === 'signup') {
+      if (user) return res.status(409).json({ error: 'An account with this phone number already exists. Please log in.' });
+      if (database.users.some(u => u.username.toLowerCase() === challenge.username.toLowerCase())) return res.status(409).json({ error: 'That username is already taken. Choose another.' });
+      const { data: userNumber, error: numberError } = await supabase.rpc('crashzone_next_user_number');
+      if (numberError) return res.status(500).json({ error: 'Could not allocate an account number. Check the Supabase SQL setup.' });
+      const credentials = hashPassword(crypto.randomBytes(32).toString('hex'));
+      user = { id: crypto.randomUUID(), userNumber: Number(userNumber), uid: String(1000000000 + Number(userNumber)), phone, username: challenge.username, balance: STARTING_CREDITS, passwordSalt: credentials.salt, passwordHash: credentials.hash, createdAt: new Date().toISOString() };
+      const { error: insertError } = await supabase.from('crashzone_users').insert(dbUser(user));
+      if (insertError) return res.status(insertError.code === '23505' ? 409 : 500).json({ error: insertError.code === '23505' ? 'An account with this phone number already exists or username is taken.' : 'Account creation failed. Please try again.' });
+      database.users.push(user);
+    }
+    if (!user) return res.status(404).json({ error: 'Account not found. Please create an account first.' });
+    if (suspendedUsers.has(user.id)) return res.status(403).json({ error: 'This account is suspended. Contact support.' });
+    setSession(res, user); res.json({ user: publicAccount(user) });
+  } catch (err) { res.status(err.status || 500).json({ error: err.status ? err.message : 'Could not verify the OTP. Please try again.' }); }
 });
 app.post('/api/auth/logout', (req, res) => {
   const token = parseCookies(req.headers.cookie).cz_session;
