@@ -116,79 +116,33 @@ app.get('/api/auth/me', (req, res) => {
   const user = sessionUser(req);
   res.json({ user: user ? publicAccount(user) : null });
 });
-// SMS OTP authentication uses Twilio Verify. Configure all three TWILIO_* variables.
-const otpAttempts = new Map();
-const otpChallenges = new Map();
-function normalizePhone(value) { return String(value || '').replace(/[\s()-]/g, ''); }
-function otpConfigReady() { return !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_VERIFY_SERVICE_SID); }
-async function twilioVerify(pathname, params) {
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const service = process.env.TWILIO_VERIFY_SERVICE_SID;
-  const response = await fetch(`https://verify.twilio.com/v2/Services/${service}/${pathname}`, {
-    method: 'POST', headers: { 'Authorization': 'Basic ' + Buffer.from(`${sid}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(params)
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    console.error('Twilio Verify request failed:', response.status, body.code || 'unknown');
-    const err = new Error(response.status === 429 ? 'Too many OTP requests. Please wait before trying again.' : 'Could not send or verify the OTP. Check the phone number and try again.');
-    err.status = response.status === 429 ? 429 : 502; throw err;
-  }
-  return body;
-}
-app.post('/api/auth/otp/start', async (req, res) => {
-  try {
-    if (!otpConfigReady()) return res.status(503).json({ error: 'SMS OTP is not configured. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_VERIFY_SERVICE_SID to the server environment.' });
-    const phone = normalizePhone(req.body?.phone);
-    const mode = req.body?.mode === 'signup' ? 'signup' : 'login';
-    const username = String(req.body?.username || '').trim();
-    if (!/^\+[1-9][0-9]{7,14}$/.test(phone)) return res.status(400).json({ error: 'Enter your phone number in international format, including country code (for example +919876543210).' });
-    const now = Date.now();
-    const recent = otpAttempts.get(phone) || [];
-    const fresh = recent.filter(t => now - t < 60 * 60 * 1000);
-    if (fresh.length >= 5) return res.status(429).json({ error: 'Too many OTP requests for this number. Try again in an hour.' });
-    const last = fresh[fresh.length - 1];
-    if (last && now - last < 30 * 1000) return res.status(429).json({ error: 'Please wait 30 seconds before requesting another OTP.' });
-    let existing = database.users.find(u => u.phone === phone);
-    if (!existing) { const { data } = await supabase.from('crashzone_users').select('*').eq('phone', phone).maybeSingle(); if (data) { existing = mapUser(data); database.users.push(existing); } }
-    if (mode === 'signup' && existing) return res.status(409).json({ error: 'An account with this phone number already exists. Please log in.' });
-    if (mode === 'login' && !existing) return res.status(404).json({ error: 'No account found for this phone number. Create an account first.' });
-    if (mode === 'signup' && !/^[A-Za-z0-9_]{3,18}$/.test(username)) return res.status(400).json({ error: 'Username must be 3–18 characters: letters, numbers, or underscores.' });
-    if (mode === 'signup' && database.users.some(u => u.username.toLowerCase() === username.toLowerCase())) return res.status(409).json({ error: 'That username is already taken. Choose another.' });
-    await twilioVerify('Verifications', { To: phone, Channel: 'sms' });
-    fresh.push(now); otpAttempts.set(phone, fresh);
-    otpChallenges.set(phone, { mode, username, createdAt: now });
-    res.json({ ok: true, message: 'Verification code sent by SMS.' });
-  } catch (err) { res.status(err.status || 500).json({ error: err.status ? err.message : 'Could not start verification. Please try again.' }); }
+app.post('/api/auth/signup', async (req, res) => {
+  const phone = String(req.body?.phone || '').replace(/[\s()-]/g, '');
+  const password = String(req.body?.password || '');
+  const requestedUsername = String(req.body?.username || '').trim();
+  if (!/^\+?[0-9]{10,15}$/.test(phone)) return res.status(400).json({ error: 'Enter a valid phone number (10–15 digits).' });
+  if (password.length < 8 || password.length > 128) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+  if (database.users.some(u => u.phone === phone)) return res.status(409).json({ error: 'An account with this phone number already exists. Please log in.' });
+  const { data: userNumber, error: numberError } = await supabase.rpc('crashzone_next_user_number');
+  if (numberError) return res.status(500).json({ error: 'Could not allocate an account number. Check the Supabase SQL setup.' });
+  const username = requestedUsername || `user${userNumber}`;
+  if (!/^[A-Za-z0-9_]{3,18}$/.test(username)) return res.status(400).json({ error: 'Username must be 3–18 characters: letters, numbers, or underscores.' });
+  if (database.users.some(u => u.username.toLowerCase() === username.toLowerCase())) return res.status(409).json({ error: 'That username is already taken. Choose another.' });
+  const credentials = hashPassword(password);
+  const user = { id: crypto.randomUUID(), userNumber: Number(userNumber), uid: String(1000000000 + Number(userNumber)), phone, username, balance: STARTING_CREDITS, passwordSalt: credentials.salt, passwordHash: credentials.hash, createdAt: new Date().toISOString() };
+  const { error: insertError } = await supabase.from('crashzone_users').insert(dbUser(user));
+  if (insertError) return res.status(insertError.code === '23505' ? 409 : 500).json({ error: insertError.code === '23505' ? 'An account with this phone number already exists. Please log in.' : 'Account creation failed. Please try again.' });
+  database.users.push(user); setSession(res, user);
+  res.status(201).json({ user: publicAccount(user) });
 });
-app.post('/api/auth/otp/verify', async (req, res) => {
-  try {
-    if (!otpConfigReady()) return res.status(503).json({ error: 'SMS OTP is not configured on the server.' });
-    const phone = normalizePhone(req.body?.phone);
-    const code = String(req.body?.code || '').trim();
-    const challenge = otpChallenges.get(phone);
-    if (!/^\+[1-9][0-9]{7,14}$/.test(phone) || !/^\d{4,10}$/.test(code)) return res.status(400).json({ error: 'Enter a valid phone number and verification code.' });
-    if (!challenge || Date.now() - challenge.createdAt > 10 * 60 * 1000) { otpChallenges.delete(phone); return res.status(400).json({ error: 'Your OTP session expired. Request a new code.' }); }
-    const result = await twilioVerify('VerificationCheck', { To: phone, Code: code });
-    if (result.status !== 'approved') return res.status(401).json({ error: 'Incorrect verification code. Please try again.' });
-    otpChallenges.delete(phone);
-    let user = database.users.find(u => u.phone === phone);
-    if (!user) { const { data } = await supabase.from('crashzone_users').select('*').eq('phone', phone).maybeSingle(); if (data) { user = mapUser(data); database.users.push(user); } }
-    if (challenge.mode === 'signup') {
-      if (user) return res.status(409).json({ error: 'An account with this phone number already exists. Please log in.' });
-      if (database.users.some(u => u.username.toLowerCase() === challenge.username.toLowerCase())) return res.status(409).json({ error: 'That username is already taken. Choose another.' });
-      const { data: userNumber, error: numberError } = await supabase.rpc('crashzone_next_user_number');
-      if (numberError) return res.status(500).json({ error: 'Could not allocate an account number. Check the Supabase SQL setup.' });
-      const credentials = hashPassword(crypto.randomBytes(32).toString('hex'));
-      user = { id: crypto.randomUUID(), userNumber: Number(userNumber), uid: String(1000000000 + Number(userNumber)), phone, username: challenge.username, balance: STARTING_CREDITS, passwordSalt: credentials.salt, passwordHash: credentials.hash, createdAt: new Date().toISOString() };
-      const { error: insertError } = await supabase.from('crashzone_users').insert(dbUser(user));
-      if (insertError) return res.status(insertError.code === '23505' ? 409 : 500).json({ error: insertError.code === '23505' ? 'An account with this phone number already exists or username is taken.' : 'Account creation failed. Please try again.' });
-      database.users.push(user);
-    }
-    if (!user) return res.status(404).json({ error: 'Account not found. Please create an account first.' });
-    if (suspendedUsers.has(user.id)) return res.status(403).json({ error: 'This account is suspended. Contact support.' });
-    setSession(res, user); res.json({ user: publicAccount(user) });
-  } catch (err) { res.status(err.status || 500).json({ error: err.status ? err.message : 'Could not verify the OTP. Please try again.' }); }
+app.post('/api/auth/login', async (req, res) => {
+  const phone = String(req.body?.phone || '').replace(/[\s()-]/g, '');
+  const password = String(req.body?.password || '');
+  let user = database.users.find(u => u.phone === phone);
+  if (!user) { const { data } = await supabase.from('crashzone_users').select('*').eq('phone', phone).maybeSingle(); if (data) { user = mapUser(data); database.users.push(user); } }
+  if (!user || !passwordMatches(password, user)) return res.status(401).json({ error: 'Incorrect phone number or password.' });
+  if (suspendedUsers.has(user.id)) return res.status(403).json({ error: 'This account is suspended. Contact support.' });
+  setSession(res, user); res.json({ user: publicAccount(user) });
 });
 app.post('/api/auth/logout', (req, res) => {
   const token = parseCookies(req.headers.cookie).cz_session;
@@ -235,7 +189,7 @@ app.get('/api/admin/overview', adminRequired, async (req, res) => {
     .select('game,entry_type,amount,created_at,round_id,user_id,username,details').order('created_at', { ascending: false }).limit(10000);
   if (error) return res.status(503).json({ error: 'P&L ledger is unavailable. Run admin/supabase-admin.sql in Supabase SQL Editor first.' });
   const byGame = {};
-  for (const game of ['aviator','bigsmall','color','lucky']) byGame[game] = { stakes: 0, payouts: 0, refunds: 0, entries: 0, rounds: new Set() };
+  for (const game of ['aviator','bigsmall','color','lucky','mines']) byGame[game] = { stakes: 0, payouts: 0, refunds: 0, entries: 0, rounds: new Set() };
   for (const row of ledger || []) {
     const g = byGame[row.game]; if (!g) continue;
     g.entries++;
@@ -245,7 +199,7 @@ app.get('/api/admin/overview', adminRequired, async (req, res) => {
     if (row.entry_type === 'refund') g.refunds += Number(row.amount) || 0;
   }
   const games = Object.fromEntries(Object.entries(byGame).map(([k,v]) => [k, { stakes:v.stakes, payouts:v.payouts, refunds:v.refunds, net:v.stakes-v.payouts-v.refunds, entries:v.entries, rounds:v.rounds.size }]));
-  res.json({ userCount: database.users.length, online: players.size, virtualCreditsInAccounts: database.users.reduce((n,u)=>n+(Number(u.balance)||0),0), games, ledger: (ledger||[]).slice(0,250), current: { aviator: { phase: state.phase, roundId: state.roundId, multiplier: state.multiplier }, mini: Object.fromEntries([...miniGames].map(([k,g])=>[k,{roundId:g.roundId,phase:Date.now()<g.closesAt?'open':'revealing'}])) } });
+  res.json({ userCount: database.users.length, online: players.size, virtualCreditsInAccounts: database.users.reduce((n,u)=>n+(Number(u.balance)||0),0), games, ledger: (ledger||[]).slice(0,250), current: { aviator: { phase: state.phase, roundId: state.roundId, multiplier: state.multiplier }, mini: Object.fromEntries([...miniGames].map(([k,g])=>[k,{roundId:g.roundId,phase:Date.now()<g.closesAt?'open':'revealing'}])), mines: { activeRounds: [...minesGames.values()].filter(g=>g.status==='active').length } } });
 });
 app.get('/api/admin/users', adminRequired, (req, res) => {
   const q = String(req.query.q || '').toLowerCase().slice(0,100);
@@ -384,7 +338,7 @@ app.get('/api/admin/reports', adminRequired, async (req,res) => {
   const user = String(req.query.user || '').slice(0,100);
   const round = String(req.query.round || '').slice(0,100);
   let q = supabase.from('crashzone_admin_ledger').select('*').order('created_at',{ascending:false}).limit(10000);
-  if (game !== 'all' && ['aviator','bigsmall','color','lucky','admin'].includes(game)) q=q.eq('game',game);
+  if (game !== 'all' && ['aviator','bigsmall','color','lucky','mines','admin'].includes(game)) q=q.eq('game',game);
   if (from) q=q.gte('created_at',from+'T00:00:00.000Z');
   if (to) q=q.lte('created_at',to+'T23:59:59.999Z');
   if (user) { if (/^[0-9a-f-]{36}$/i.test(user)) q=q.eq('user_id',user); else q=q.ilike('username',`%${user.replace(/[%,()]/g,'')}%`); }
@@ -392,7 +346,7 @@ app.get('/api/admin/reports', adminRequired, async (req,res) => {
   const {data,error}=await q;
   if(error)return res.status(503).json({error:'Could not load ledger. Apply the admin SQL migration.'});
   const rows=data||[]; const byGame={};
-  for(const k of ['aviator','bigsmall','color','lucky'])byGame[k]={stakes:0,payouts:0,refunds:0,bonuses:0,adjustments:0,net:0,entries:0};
+  for(const k of ['aviator','bigsmall','color','lucky','mines'])byGame[k]={stakes:0,payouts:0,refunds:0,bonuses:0,adjustments:0,net:0,entries:0};
   for(const r of rows){const g=byGame[r.game];if(!g)continue;g.entries++;const n=Number(r.amount)||0;if(r.entry_type==='stake')g.stakes+=n;if(r.entry_type==='payout')g.payouts+=n;if(r.entry_type==='refund')g.refunds+=n;if(r.entry_type==='bonus')g.bonuses+=n;if(r.entry_type==='adjustment')g.adjustments+=n;}
   for(const g of Object.values(byGame))g.net=g.stakes-g.payouts-g.refunds;
   const ex=await supabase.from('crashzone_admin_expenses').select('*').order('expense_date',{ascending:false}).limit(2000);
@@ -536,6 +490,64 @@ function persistBalance(player) {
   const user = database.users.find(u => u.id === player.userId);
   if (user) { user.balance = player.balance; void saveUser(user); }
 }
+
+// Mines uses server-owned rounds and crypto-secure mine placement. Coins only; no cash value.
+const minesGames = new Map();
+const minesHistory = new Map();
+function minesMultiplier(mines, safePicks) {
+  let value = 0.97;
+  for (let i = 0; i < safePicks; i++) value *= (25 - i) / (25 - mines - i);
+  return Math.floor(value * 100) / 100;
+}
+function minesPublic(game, reveal = false) {
+  return { id: game.id, stake: game.stake, mineCount: game.mineCount, picked: [...game.picked], multiplier: minesMultiplier(game.mineCount, game.picked.length),
+    potentialPayout: Math.floor(game.stake * minesMultiplier(game.mineCount, game.picked.length)), status: game.status,
+    mines: reveal ? [...game.mines] : undefined, balance: game.balance };
+}
+function syncMinesBalance(user) {
+  for (const player of players.values()) if (player.userId === user.id) { player.balance = user.balance; const sock = io.sockets.sockets.get(player.id); if (sock) sendPlayer(sock); }
+  broadcast();
+}
+app.get('/api/mines/state', authRequired, (req, res) => {
+  const game = minesGames.get(req.account.id);
+  res.json({ game: game && game.status === 'active' ? minesPublic(game) : null, history: (minesHistory.get(req.account.id) || []).slice(0, 20), balance: req.account.balance });
+});
+app.post('/api/mines/start', authRequired, async (req, res) => {
+  const existing = minesGames.get(req.account.id);
+  if (existing && (existing.status === 'active' || existing.status === 'starting')) return res.status(409).json({ error: 'Finish your current Mines round first.' });
+  const stake = Number(req.body?.amount), mineCount = Number(req.body?.mines);
+  if (!Number.isSafeInteger(stake) || stake < 1 || stake > 1000) return res.status(400).json({ error: 'Bet amount must be 1–1,000 coins.' });
+  if (!Number.isInteger(mineCount) || mineCount < 1 || mineCount > 24) return res.status(400).json({ error: 'Choose 1–24 mines.' });
+  if (stake > req.account.balance) return res.status(400).json({ error: 'Not enough coins.' });
+  const positions = new Set(); while (positions.size < mineCount) positions.add(crypto.randomInt(0, 25));
+  minesGames.set(req.account.id, { status: 'starting' });
+  req.account.balance -= stake; await saveUser(req.account);
+  const game = { id: crypto.randomUUID(), roundId: Date.now().toString(36), userId: req.account.id, username: req.account.username, stake, mineCount, mines: [...positions], picked: [], status: 'active', startedAt: new Date().toISOString(), balance: req.account.balance };
+  minesGames.set(req.account.id, game);
+  writeLedger({ game: 'mines', roundId: game.roundId, userId: game.userId, username: game.username, entryType: 'stake', amount: stake, details: { mineCount } });
+  syncMinesBalance(req.account); res.status(201).json({ game: minesPublic(game), balance: req.account.balance });
+});
+app.post('/api/mines/pick', authRequired, (req, res) => {
+  const game = minesGames.get(req.account.id); if (!game || game.status !== 'active') return res.status(409).json({ error: 'Start a new round first.' });
+  const tile = Number(req.body?.tile); if (!Number.isInteger(tile) || tile < 0 || tile > 24) return res.status(400).json({ error: 'Choose a valid tile.' });
+  if (game.picked.includes(tile)) return res.status(409).json({ error: 'That tile is already revealed.' });
+  if (game.mines.includes(tile)) {
+    game.status = 'lost'; game.balance = req.account.balance;
+    writeLedger({ game: 'mines', roundId: game.roundId, userId: game.userId, username: game.username, entryType: 'loss', amount: 0, details: { stake: game.stake, mineCount: game.mineCount, tile } });
+    const history = minesHistory.get(game.userId) || []; history.unshift({ roundId: game.roundId, stake: game.stake, payout: 0, net: -game.stake, mines: game.mineCount, outcome: 'Lost', date: new Date().toISOString() }); minesHistory.set(game.userId, history.slice(0, 50));
+    return res.json({ hitMine: true, game: minesPublic(game, true), balance: req.account.balance, history: history.slice(0, 20) });
+  }
+  game.picked.push(tile); return res.json({ hitMine: false, game: minesPublic(game), balance: req.account.balance });
+});
+app.post('/api/mines/cashout', authRequired, async (req, res) => {
+  const game = minesGames.get(req.account.id); if (!game || game.status !== 'active') return res.status(409).json({ error: 'There is no active round to cash out.' });
+  if (!game.picked.length) return res.status(400).json({ error: 'Reveal at least one safe tile before cashing out.' });
+  const multiplier = minesMultiplier(game.mineCount, game.picked.length), payout = Math.floor(game.stake * multiplier);
+  game.status = 'cashed_out'; req.account.balance += payout; game.balance = req.account.balance; await saveUser(req.account); syncMinesBalance(req.account);
+  writeLedger({ game: 'mines', roundId: game.roundId, userId: game.userId, username: game.username, entryType: 'payout', amount: payout, details: { stake: game.stake, mineCount: game.mineCount, safePicks: game.picked.length, multiplier } });
+  const history = minesHistory.get(game.userId) || []; history.unshift({ roundId: game.roundId, stake: game.stake, payout, net: payout - game.stake, mines: game.mineCount, outcome: 'Cashed out', date: new Date().toISOString() }); minesHistory.set(game.userId, history.slice(0, 50));
+  res.json({ game: minesPublic(game, true), payout, multiplier, balance: req.account.balance, history: history.slice(0, 20) });
+});
 function snapshot() {
   return {
     phase: state.phase, roundId: state.roundId, multiplier: state.multiplier,
