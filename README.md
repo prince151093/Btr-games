@@ -55,3 +55,22 @@ The server expects `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` at startup and
 - The player app shows one 3-second win/loss/break-even overlay for each settled Big Small, Color Prediction, or Lucky Number round with bets, using the server's authoritative round summary (total payout minus total stake). Aviator retains its own bet-result display.
 - Admin → Game Management includes **Next-round result · Demo / QA only**. Queue a one-shot test outcome for Aviator (1.00×–1000.00×), Big Small (digit 0–9), Color Prediction (listed color), or Lucky Number (digit 0–9). It is consumed by the next round start and recorded in the audit log.
 - Queued outcomes are stored in server memory and are lost on restart. This is for transparent virtual-credit testing only; do not use forced outcomes to misrepresent the fairness of a game.
+
+
+## Independent BIG SMALL rounds
+
+The lobby includes three independent BIG SMALL virtual-coin games:
+
+- `big_small_30s` — 30-second rounds
+- `big_small_1m` — 60-second rounds
+- `big_small_5m` — 300-second rounds
+
+Each identifier owns a separate in-memory round state and result history, and uses the existing server-authoritative Socket.IO round flow and virtual-credit ledger. Existing `bigsmall` compatibility remains in place. Admin duration settings for these IDs can be saved through the existing `/api/admin/settings/:game` endpoint; the built-in defaults are 30, 60, and 300 seconds.
+
+**Icon note:** The supplied ZIP contained no separate icon image files, so the three lobby cards currently use matching inline BIG SMALL artwork with the duration shown on each card. Replace these card SVGs with the supplied icon assets when those files are available.
+
+## Validation performed for this update
+
+- `node --check server.js` passed.
+- Both inline JavaScript blocks in `src/public/index.html` passed `node --check`.
+- Full live server/database and multi-client integration tests were not run because this project requires configured Supabase environment variables and a reachable Supabase project.
