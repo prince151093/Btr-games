@@ -74,3 +74,16 @@ Each identifier owns a separate in-memory round state and result history, and us
 - `node --check server.js` passed.
 - Both inline JavaScript blocks in `src/public/index.html` passed `node --check`.
 - Full live server/database and multi-client integration tests were not run because this project requires configured Supabase environment variables and a reachable Supabase project.
+
+
+## Game lobby update
+- Lobby is grouped into three rows: Big Small (30s, 1m, 5m), Lucky Number (30s, 1m, 5m), and Aviator + Mines.
+- Lucky Number has three independent server-side round streams (`lucky_30s`, `lucky_1m`, `lucky_5m`), each with its own round duration and result history.
+- Supplied Lucky Number, Aviator, and Mines icons are stored in `src/public/assets/`.
+- Big Small selection/history uses the professional number-ball assets.
+- Admin > Game Management includes the new duration-specific modes.
+
+
+## Color Prediction icon update
+
+The lobby now includes a Color Prediction game card alongside Aviator and Mines, using `src/public/assets/color-prediction-icon.png`. The card opens the existing Color Prediction mode (`color`) and keeps its existing result/history flow.
