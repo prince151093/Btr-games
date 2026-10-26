@@ -281,6 +281,76 @@ header{background:#050711d9!important;border-bottom:1px solid #f7b83d55!importan
 .mini-topline{background:linear-gradient(115deg,#f6d991,#d6a54d)!important}
 @media(max-width:500px){body:not(.game-mode):not(.mini-mode):not(.mines-mode):not(.arcade-mode){background-position:center top;background-size:auto 100vh;background-attachment:scroll}.lobby{padding-top:14px}}
 
+
+/* BTR visual polish patch: consistent premium background and reliable result-ball labels */
+.auth-screen{
+  background:
+    linear-gradient(180deg,rgba(3,6,15,.48),rgba(3,6,15,.88)),
+    url('./assets/main-menu-bg.png') center center/cover fixed,
+    radial-gradient(ellipse at 50% 0%,#1b2c49 0,#090d17 65%) !important;
+  isolation:isolate;
+}
+.auth-screen::before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:-1;
+  background:radial-gradient(ellipse at 50% 12%,rgba(40,91,153,.24),transparent 55%);
+}
+.auth-card{
+  position:relative;width:min(100%,420px);padding:clamp(22px,6vw,30px);
+  background:linear-gradient(150deg,rgba(20,32,53,.97),rgba(7,12,24,.97)) !important;
+  border:1px solid rgba(135,169,220,.38) !important;border-radius:24px !important;
+  box-shadow:0 24px 80px #000a, inset 0 1px 0 #ffffff12 !important;
+  backdrop-filter:blur(16px);
+}
+.auth-card .logo{font-size:25px;letter-spacing:1.2px}
+.auth-title{font-size:clamp(26px,7vw,32px);letter-spacing:-.6px}
+.auth-sub{line-height:1.6}
+.auth-input{height:52px;border-radius:13px;transition:border-color .2s,box-shadow .2s}
+.auth-input:focus{border-color:#76a9ff;box-shadow:0 0 0 3px #4387f52b}
+.auth-card button,.auth-submit{min-height:50px;border-radius:13px;font-weight:850}
+body.game-mode,body.mini-mode,body.mines-mode,body.arcade-mode{
+  background:#05070d url('./assets/main-menu-bg.png') center top/cover fixed no-repeat !important;
+}
+body.game-mode::before,body.mini-mode::before,body.mines-mode::before,body.arcade-mode::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(180deg,rgba(3,5,12,.76),rgba(5,8,17,.92));
+}
+body.mini-mode #miniView,body.game-mode #gameView{
+  background:transparent;
+}
+.mini-panel,.mini-game-panel,.mini-shell{
+  background:linear-gradient(155deg,rgba(18,30,50,.97),rgba(7,12,24,.98)) !important;
+  border-color:rgba(120,151,196,.32) !important;
+  box-shadow:0 16px 44px #0005;
+}
+/* Keep the number visible even if legacy PNG/CSS layers fail to load. */
+.history-billiard-ball,.mini-history .history-billiard-ball,.mini-recent .history-billiard-ball{
+  background-image:none !important;
+  position:relative !important;
+  overflow:visible !important;
+  isolation:isolate;
+}
+.history-billiard-ball .ball-number-label,.mini-history .history-billiard-ball .ball-number-label,
+.mini-recent .history-billiard-ball .ball-number-label{
+  display:flex !important;visibility:visible !important;opacity:1 !important;
+  position:relative !important;z-index:10 !important;
+  width:62% !important;height:62% !important;min-width:0;
+  align-items:center !important;justify-content:center !important;
+  border-radius:50% !important;background:#fffdf5 !important;color:#111 !important;
+  font-size:clamp(10px,2.8vw,14px) !important;font-weight:1000 !important;
+  line-height:1 !important;text-shadow:none !important;box-shadow:0 1px 3px #0008;
+}
+/* Stable, glossy ball colors for all digits including red-number outcomes. */
+.history-billiard-ball.ball-num-0,.history-billiard-ball.ball-num-2,
+.history-billiard-ball.ball-num-4,.history-billiard-ball.ball-num-6,
+.history-billiard-ball.ball-num-8{
+  background:radial-gradient(circle at 28% 20%,#fff4f7 0%,#f45a73 24%,#c51e42 60%,#650b20 100%) !important;
+}
+.history-billiard-ball.ball-num-1,.history-billiard-ball.ball-num-3,
+.history-billiard-ball.ball-num-5,.history-billiard-ball.ball-num-7,
+.history-billiard-ball.ball-num-9{
+  background:radial-gradient(circle at 28% 20%,#effff8 0%,#38d7a0 24%,#079565 60%,#034c3b 100%) !important;
+}
+
 </style>
 <style>
 .wallet-modal{position:fixed;inset:0;z-index:1000;background:#030711d9;display:grid;place-items:center;padding:14px}.wallet-modal[hidden]{display:none}.wallet-modal-card{width:min(620px,100%);max-height:90dvh;overflow:auto;background:linear-gradient(145deg,#172237,#0b1220);border:1px solid #35445d;border-radius:20px;padding:18px;color:#f5f7fb;box-shadow:0 24px 80px #0009}.wallet-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.wallet-modal-head h2{margin:0;font-size:22px}.wallet-close{background:#26344b;color:white;border:1px solid #41516b;border-radius:10px;padding:8px 12px}.wallet-form-label{display:block;color:#a9bad2;font-size:13px;margin:12px 0 6px}.wallet-form-input{width:100%;padding:12px;border:1px solid #354966;border-radius:11px;background:#070e1a;color:white;font:inherit}.wallet-primary{width:100%;border:0;border-radius:12px;background:linear-gradient(135deg,#ffe29a,#d9a84b);color:#2a1b04;font-weight:900;padding:13px;margin-top:14px}.wallet-quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0}.wallet-quick{background:#17253b;border:1px solid #344a69;border-radius:10px;padding:10px 3px;color:#f4f7ff;font-weight:800}.wallet-quick.active{border-color:#ffd36c;background:#3c3421;color:#ffe09a}.wallet-qr{display:block;width:min(260px,100%);margin:12px auto;background:white;border-radius:12px;padding:8px}.wallet-note{font-size:12px;line-height:1.5;color:#a9bad2}.wallet-list{display:grid;gap:8px}.wallet-list-item{border:1px solid #2b3b55;background:#0c1525;border-radius:12px;padding:12px;overflow-wrap:anywhere}.wallet-list-item strong{color:#ffe09a}.wallet-status{display:inline-block;border-radius:99px;padding:4px 8px;background:#293951;font-size:11px;text-transform:uppercase}.wallet-status.approved{background:#123d31;color:#80f1c0}.wallet-status.rejected{background:#4a202b;color:#ffb0bd}@media(max-width:420px){.wallet-modal-card{padding:13px}.wallet-quick-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
