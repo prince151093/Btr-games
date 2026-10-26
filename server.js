@@ -496,8 +496,7 @@ function persistBalance(player) {
 const minesGames = new Map();
 const minesHistory = new Map();
 function minesMultiplier(mines, safePicks) {
-  const payoutFactor = mines === 1 ? 0.965 : mines === 2 ? 0.960 : mines === 3 ? 0.955 : 0.97;
-  let value = payoutFactor;
+  let value = 0.97;
   for (let i = 0; i < safePicks; i++) value *= (25 - i) / (25 - mines - i);
   return Math.floor(value * 100) / 100;
 }
