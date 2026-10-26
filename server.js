@@ -496,7 +496,10 @@ function persistBalance(player) {
 const minesGames = new Map();
 const minesHistory = new Map();
 function minesMultiplier(mines, safePicks) {
-  let value = 0.97;
+  // Lower the configured payout factor for 1–3 mine modes, while keeping
+  // the multiplier calculation server-authoritative for preview and settlement.
+  const payoutFactor = mines === 1 ? 0.965 : mines === 2 ? 0.960 : mines === 3 ? 0.955 : 0.97;
+  let value = payoutFactor;
   for (let i = 0; i < safePicks; i++) value *= (25 - i) / (25 - mines - i);
   return Math.floor(value * 100) / 100;
 }
