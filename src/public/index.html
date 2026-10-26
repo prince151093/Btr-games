@@ -356,6 +356,51 @@ body.mini-mode #miniView,body.game-mode #gameView{
 .wallet-modal{position:fixed;inset:0;z-index:1000;background:#030711d9;display:grid;place-items:center;padding:14px}.wallet-modal[hidden]{display:none}.wallet-modal-card{width:min(620px,100%);max-height:90dvh;overflow:auto;background:linear-gradient(145deg,#172237,#0b1220);border:1px solid #35445d;border-radius:20px;padding:18px;color:#f5f7fb;box-shadow:0 24px 80px #0009}.wallet-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.wallet-modal-head h2{margin:0;font-size:22px}.wallet-close{background:#26344b;color:white;border:1px solid #41516b;border-radius:10px;padding:8px 12px}.wallet-form-label{display:block;color:#a9bad2;font-size:13px;margin:12px 0 6px}.wallet-form-input{width:100%;padding:12px;border:1px solid #354966;border-radius:11px;background:#070e1a;color:white;font:inherit}.wallet-primary{width:100%;border:0;border-radius:12px;background:linear-gradient(135deg,#ffe29a,#d9a84b);color:#2a1b04;font-weight:900;padding:13px;margin-top:14px}.wallet-quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0}.wallet-quick{background:#17253b;border:1px solid #344a69;border-radius:10px;padding:10px 3px;color:#f4f7ff;font-weight:800}.wallet-quick.active{border-color:#ffd36c;background:#3c3421;color:#ffe09a}.wallet-qr{display:block;width:min(260px,100%);margin:12px auto;background:white;border-radius:12px;padding:8px}.wallet-note{font-size:12px;line-height:1.5;color:#a9bad2}.wallet-list{display:grid;gap:8px}.wallet-list-item{border:1px solid #2b3b55;background:#0c1525;border-radius:12px;padding:12px;overflow-wrap:anywhere}.wallet-list-item strong{color:#ffe09a}.wallet-status{display:inline-block;border-radius:99px;padding:4px 8px;background:#293951;font-size:11px;text-transform:uppercase}.wallet-status.approved{background:#123d31;color:#80f1c0}.wallet-status.rejected{background:#4a202b;color:#ffb0bd}@media(max-width:420px){.wallet-modal-card{padding:13px}.wallet-quick-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
 .game-row{margin-bottom:6px}.game-icon-img,.big-small-game-icon{display:block;width:100%;height:100%;object-fit:contain;border-radius:9px;transition:transform .35s cubic-bezier(.2,.8,.2,1),filter .35s}.game-card:hover .game-icon-img,.game-card:hover .big-small-game-icon{transform:scale(1.045);filter:drop-shadow(0 8px 15px #0007)}.game-art:has(.game-icon-img),.game-art:has(.big-small-game-icon){background:#080b14;border:1px solid #ffffff13}#otherGameGrid{grid-template-columns:repeat(3,minmax(0,1fr));max-width:1100px}@media(max-width:500px){#otherGameGrid{grid-template-columns:repeat(3,minmax(0,1fr))}.game-art:has(.game-icon-img),.game-art:has(.big-small-game-icon){height:auto;aspect-ratio:1/1}.game-title{line-height:1.2}.game-caption{line-height:1.25}}
+
+/* BTR Games auth redesign — premium dark gaming theme */
+.auth-screen{
+  background:linear-gradient(180deg,rgba(2,5,15,.66),rgba(2,5,15,.84)),
+    url('./assets/main-menu-bg.png') center center/cover fixed no-repeat !important;
+  padding:24px 16px !important;isolation:isolate;
+}
+.auth-screen::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 30%,rgba(18,53,103,.25),transparent 58%),
+             linear-gradient(90deg,rgba(1,5,14,.25),transparent 50%,rgba(1,5,14,.25));}
+.auth-card{
+  width:min(100%,430px) !important;padding:clamp(24px,6vw,34px) !important;
+  background:linear-gradient(155deg,rgba(8,18,38,.96),rgba(3,8,20,.97)) !important;
+  border:1px solid rgba(73,133,226,.62) !important;border-radius:26px !important;
+  box-shadow:0 28px 90px #000b,inset 0 1px 0 #ffffff12,0 0 28px #1252a21c !important;
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+}
+.auth-card .logo{font-size:clamp(27px,7vw,34px) !important;font-weight:1000;letter-spacing:.5px;
+  text-align:center;margin:4px 0 28px !important;text-shadow:0 4px 22px #0009;}
+.auth-card .logo::before{content:"✈";display:flex;align-items:center;justify-content:center;
+  width:58px;height:58px;margin:0 auto 14px;border-radius:18px;
+  color:#fff;font-size:28px;background:linear-gradient(145deg,#ff415c,#c90035);
+  box-shadow:0 8px 28px #f0184938;border:1px solid #ff718b66;}
+.auth-title{text-align:center;font-size:clamp(27px,7vw,32px) !important;font-weight:900;letter-spacing:-.6px;margin:0 0 8px !important;}
+.auth-sub{text-align:center;font-size:14px !important;line-height:1.6;margin-bottom:26px !important;color:#aebed8 !important;}
+.auth-label{font-size:12px !important;letter-spacing:.35px;margin:15px 0 7px !important;color:#b9c9e4 !important;}
+.auth-input{height:54px !important;border-radius:13px !important;border:1px solid #35517e !important;
+  background:rgba(5,13,29,.82) !important;padding:14px 15px !important;color:#f7f9ff !important;
+  box-shadow:inset 0 1px 5px #0004;}
+.auth-input::placeholder{color:#7f94b9;}
+.auth-input:focus{border-color:#6ca8ff !important;box-shadow:0 0 0 3px #3987ff25,0 0 18px #2875df17 !important;}
+#authSubmit.primary{width:100%;min-height:54px;margin-top:14px;border:0 !important;border-radius:14px !important;
+  background:linear-gradient(110deg,#ff4058 0%,#f30d3f 55%,#c90035 100%) !important;color:#fff !important;
+  font-size:16px;font-weight:900;box-shadow:0 10px 26px #ee17402e,inset 0 1px 0 #ffffff40 !important;}
+#authSubmit.primary:active{transform:translateY(1px);}
+.auth-switch{min-height:52px;width:100%;margin-top:13px !important;border-radius:14px !important;
+  border:1px solid #627da8 !important;background:rgba(13,27,49,.7) !important;color:#f2f6ff !important;
+  font-weight:800;box-shadow:none !important;}
+.auth-switch:hover{background:rgba(29,51,83,.85) !important;border-color:#8db7ff !important;}
+.auth-card .lobby-note{color:#91a5c6 !important;margin-top:18px;font-size:12px;}
+.auth-error{min-height:17px;line-height:1.45;}
+@media(max-width:500px){.auth-screen{align-items:center;padding:18px 14px !important;background-attachment:scroll !important;}
+ .auth-card{padding:24px 21px !important;border-radius:23px !important;}}
+@media(min-height:760px){.auth-card{margin:auto 0;}}
+
 </style>
 </head>
 <body>
@@ -363,7 +408,7 @@ body.mini-mode #miniView,body.game-mode #gameView{
 <div class="auth-screen" id="authScreen">
  <div class="auth-card">
   <div class="logo" style="margin-bottom:20px">BTR<span style="color:var(--red)"> GAMES</span></div>
-  <h1 class="auth-title" id="authTitle">Welcome back</h1><div class="auth-sub" id="authSub">Log in to continue to Btr Games.</div>
+  <h1 class="auth-title" id="authTitle">Welcome back</h1><div class="auth-sub" id="authSub">Log in to continue to BTR Games.</div>
   <form id="authForm">
    <label class="auth-label" for="authPhone">Phone number</label><input class="auth-input" id="authPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Enter phone number" required maxlength="18">
    <label class="auth-label" for="authPassword">Password</label><input class="auth-input" id="authPassword" name="password" type="password" autocomplete="current-password" placeholder="At least 8 characters" required minlength="8" maxlength="128">
@@ -711,7 +756,7 @@ function startGameSocket(){
  async function api(url,options={}){const r=await fetch(url,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||'Something went wrong.');return data;}
  function showAuth(){ $('authScreen').classList.remove('hidden'); $('profileScreen').classList.remove('show'); document.body.classList.remove('game-mode'); }
  function showApp(user){currentUser=user;$('authScreen').classList.add('hidden');$('profileUid').textContent=user.uid;$('profilePhone').textContent=user.phone;$('profileUsername').value=user.username;$('lobbyBalance').textContent=Number(user.balance||0).toLocaleString('en-US');$('balance').textContent=Number(user.balance||0).toLocaleString('en-US');if(!socketStarted){socketStarted=true;startGameSocket();}}
- function updateAuthMode(){ $('authTitle').textContent=signupMode?'Create your account':'Welcome back';$('authSub').textContent=signupMode?'Create your Btr Games account with your phone number. No OTP required.':'Log in to continue to Btr Games.';$('authSubmit').textContent=signupMode?'Create Account':'Log In';$('authPassword').autocomplete=signupMode?'new-password':'current-password';$('authPassword').placeholder=signupMode?'Create a strong password':'Enter your password';$('authSwitch').textContent=signupMode?'Already have an account? Log in':'✨ New to Btr Games?  CREATE ACCOUNT';$('authSwitch').style.borderColor=signupMode?'#6b5526':'#ffd36c';$('signupFields').classList.toggle('hidden',!signupMode);$('authConfirmPassword').required=signupMode;$('authUsername').required=signupMode;$('authError').textContent='';$('authPassword').minLength=signupMode?8:1;if(signupMode&&!$('authUsername').value)$('authUsername').value='user5';}
+ function updateAuthMode(){ $('authTitle').textContent=signupMode?'Create your account':'Welcome back';$('authSub').textContent=signupMode?'Create your BTR Games account with your phone number. No OTP required.':'Log in to continue to BTR Games.';$('authSubmit').textContent=signupMode?'Create Account':'Log In';$('authPassword').autocomplete=signupMode?'new-password':'current-password';$('authPassword').placeholder=signupMode?'Create a strong password':'Enter your password';$('authSwitch').textContent=signupMode?'Already have an account? Log in':'✨ New to Btr Games?  CREATE ACCOUNT';$('authSwitch').style.borderColor=signupMode?'#6b5526':'#ffd36c';$('signupFields').classList.toggle('hidden',!signupMode);$('authConfirmPassword').required=signupMode;$('authUsername').required=signupMode;$('authError').textContent='';$('authPassword').minLength=signupMode?8:1;if(signupMode&&!$('authUsername').value)$('authUsername').value='user5';}
  $('authSwitch').addEventListener('click',()=>{signupMode=!signupMode;updateAuthMode()});
  $('authForm').addEventListener('submit',async e=>{e.preventDefault();$('authSubmit').disabled=true;$('authError').textContent='';try{if(signupMode&&$('authPassword').value!==$('authConfirmPassword').value)throw new Error('Passwords do not match.');const payload={phone:$('authPhone').value,password:$('authPassword').value};if(signupMode)payload.username=$('authUsername').value.trim();const data=await api(signupMode?'/api/auth/signup':'/api/auth/login',{method:'POST',body:JSON.stringify(payload)});showApp(data.user);$('authPassword').value='';$('authConfirmPassword').value='';}catch(err){$('authError').textContent=err.message;}finally{$('authSubmit').disabled=false;}});
  window.openProfile=()=>{if(!currentUser)return; $('profileUid').textContent=currentUser.uid;$('profilePhone').textContent=currentUser.phone;$('profileUsername').value=currentUser.username;$('profileError').textContent='';$('profileScreen').classList.add('show');};
