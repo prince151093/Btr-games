@@ -344,28 +344,134 @@ body.mini-mode,body.game-mode,body.mines-mode,body.arcade-mode{
 .history-billiard-ball .ball-number-label,.mini-recent .history-billiard-ball .ball-number-label{z-index:3!important;position:relative!important}
 .mini-note{display:none!important}
 
+
+/* BTR authentication rebuilt to match the supplied aviation-themed reference */
+.auth-screen{
+ position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+ padding:clamp(14px,4vw,28px);overflow:auto;isolation:isolate;
+ background:#030817 url('./assets/main-menu-bg.png') center center/cover no-repeat fixed!important;
+}
+.auth-screen::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+ background:linear-gradient(180deg,rgba(2,7,22,.80),rgba(2,8,24,.72) 45%,rgba(1,5,18,.94)),
+ radial-gradient(ellipse at 50% 35%,rgba(18,65,126,.2),transparent 62%)}
+.auth-welcome,.auth-card{
+ width:min(100%,420px);min-height:min(690px,calc(100dvh - 36px));position:relative;
+ overflow:hidden;border-radius:27px;border:1px solid rgba(65,124,220,.72);
+ background:linear-gradient(160deg,rgba(3,12,31,.77),rgba(2,8,23,.94));
+ box-shadow:0 24px 75px rgba(0,0,0,.52),inset 0 1px 0 rgba(255,255,255,.08);
+}
+.auth-welcome{display:flex;flex-direction:column;justify-content:flex-end;padding:clamp(24px,7vw,34px);gap:18px}
+.auth-welcome::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+ background:radial-gradient(ellipse at 80% 25%,rgba(255,36,72,.12),transparent 35%),
+ linear-gradient(180deg,transparent 30%,rgba(2,7,21,.26) 48%,rgba(2,7,21,.92) 100%)}
+.auth-welcome>*{position:relative;z-index:1}
+.auth-brand-mark{position:absolute!important;top:18%;left:0;right:0;display:flex;flex-direction:column;align-items:center;line-height:.9;text-shadow:0 6px 24px #000b}
+.brand-wing{font-size:clamp(42px,12vw,58px);font-weight:900;color:#ff334e;transform:rotate(-12deg);filter:drop-shadow(0 0 13px #ff173f77);margin-bottom:10px}
+.brand-btr{font-size:clamp(58px,17vw,76px);font-weight:1000;letter-spacing:-3px;font-style:italic;color:#f5f8ff}
+.brand-games{font-size:clamp(29px,8vw,36px);font-weight:1000;font-style:italic;letter-spacing:-.6px;color:#ff304f;margin-top:8px}
+.auth-welcome-copy{margin-top:auto;padding-top:280px;text-align:center}
+.auth-eyebrow{font-size:11px;font-weight:900;letter-spacing:3px;color:#91b8ff}
+.auth-welcome-copy h1{margin:9px 0 5px;font-size:clamp(27px,7vw,34px);font-weight:950;letter-spacing:-.7px;color:#f8faff}
+.auth-welcome-copy h1 span{color:#ff3654}
+.auth-welcome-copy p{margin:0;color:#aabbd8;font-size:15px}
+.auth-welcome-actions{display:grid;gap:12px;margin-top:14px}
+.auth-login-cta,.auth-signup-cta,.auth-submit{width:100%;min-height:54px;border-radius:13px;font:inherit;font-weight:900;cursor:pointer}
+.auth-login-cta,.auth-submit{border:1px solid #ff5368;color:#fff;background:linear-gradient(105deg,#ff2948,#e90035);box-shadow:0 9px 25px #f20a3938,inset 0 1px #ffffff55}
+.auth-signup-cta{border:1px solid #9baac8;background:rgba(3,11,29,.52);color:#f6f8ff}
+.auth-welcome-foot{text-align:center;font-size:9px;font-weight:800;letter-spacing:1.8px;color:#7187ad;margin-top:12px}
+.auth-card{display:none;padding:clamp(23px,6vw,31px);align-self:center;flex-direction:column;justify-content:center}
+.auth-card.active{display:flex}
+.auth-back{align-self:flex-start;border:0;background:transparent;color:#b8c9e8;font:inherit;font-weight:750;padding:0 0 24px;cursor:pointer}
+.auth-back:first-letter{font-size:25px}
+.auth-form-heading{text-align:center;margin-bottom:25px}
+.auth-title{margin:0!important;font-size:clamp(28px,7vw,34px)!important;font-weight:950;letter-spacing:-.7px;color:#f7f9ff}
+.auth-sub{margin:2px 0 0!important;color:#bdc9e3!important;font-size:clamp(17px,4.5vw,21px)!important;font-weight:400;line-height:1.4}
+.auth-label{display:block;color:#a9bad9;font-size:12px;font-weight:750;letter-spacing:.3px;margin:14px 0 7px}
+.auth-input-wrap{position:relative;display:flex;align-items:center}
+.auth-input-icon{position:absolute;left:14px;z-index:2;color:#a8bce4;font-size:17px;pointer-events:none}
+.auth-input{width:100%;height:53px;border:1px solid #344f83;border-radius:12px;background:rgba(10,22,48,.78);color:#f8faff;padding:12px 43px 12px 43px;font:inherit;font-size:14px;outline:none;box-shadow:inset 0 1px 0 #ffffff08;transition:border-color .18s,box-shadow .18s}
+.auth-input::placeholder{color:#7f91b5}
+.auth-input:focus{border-color:#77a9ff;box-shadow:0 0 0 3px #4186ff24}
+.auth-eye{position:absolute;right:9px;border:0;background:transparent;color:#a8bce4;font-size:17px;padding:8px;cursor:pointer}
+.auth-submit{margin-top:22px}
+.auth-bottom-switch{display:flex;justify-content:center;align-items:center;gap:5px;flex-wrap:wrap;margin-top:27px;color:#9eafce;font-size:12px}
+.auth-switch{display:inline!important;width:auto!important;border:0!important;background:transparent!important;color:#ff4964!important;padding:0!important;margin:0!important;box-shadow:none!important;font:inherit!important;font-weight:900!important;cursor:pointer}
+.signup-hint{font-size:11px;color:#9eafce;margin-top:7px}
+.auth-error{color:#ff8d9e;font-size:12px;min-height:17px;margin-top:8px}
+@media(max-height:720px){.auth-welcome,.auth-card{min-height:calc(100dvh - 24px)}.auth-brand-mark{top:9%}.auth-welcome-copy{padding-top:230px}.auth-card{padding-top:18px;padding-bottom:18px}.auth-back{padding-bottom:12px}.auth-form-heading{margin-bottom:12px}.auth-label{margin-top:10px}.auth-input{height:48px}.auth-submit{margin-top:15px}.auth-bottom-switch{margin-top:17px}}
+@media(min-width:700px){.auth-welcome,.auth-card{min-height:720px}}
+/* Results fix: force every result digit above decorative layers and keep it legible. */
+.history-billiard-ball,.mini-recent .history-billiard-ball{
+ position:relative!important;isolation:isolate!important;overflow:hidden!important;
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;
+ background-size:100% 100%!important;
+}
+.history-billiard-ball .ball-number-label,.mini-recent .history-billiard-ball .ball-number-label{
+ display:flex!important;visibility:visible!important;opacity:1!important;
+ position:absolute!important;inset:23%!important;width:auto!important;height:auto!important;
+ min-width:0!important;min-height:0!important;margin:0!important;padding:0!important;
+ align-items:center!important;justify-content:center!important;border-radius:50%!important;
+ z-index:20!important;isolation:isolate!important;overflow:visible!important;
+ background:radial-gradient(circle at 32% 24%,#fff 0%,#f7f7f4 68%,#d8dce3 100%)!important;
+ color:#10131a!important;border:1px solid #fff!important;
+ box-shadow:0 1px 4px #000b,inset 0 1px 2px #fff!important;
+ font-size:clamp(10px,2.8vw,14px)!important;font-weight:1000!important;
+ line-height:1!important;text-shadow:none!important;transform:none!important;
+}
+.mini-recent .history-billiard-ball .ball-number-label{font-size:10px!important;inset:21%!important}
+.history-billiard-ball.ball-num-0,.history-billiard-ball.ball-num-5,
+.mini-recent .history-billiard-ball.ball-num-0,.mini-recent .history-billiard-ball.ball-num-5{
+ background:linear-gradient(90deg,#9b31e8 0 49.5%,#0aa86f 50.5% 100%)!important;
+}
+.history-billiard-ball.ball-num-0::before,.history-billiard-ball.ball-num-5::before,
+.mini-recent .history-billiard-ball.ball-num-0::before,.mini-recent .history-billiard-ball.ball-num-5::before{
+ content:""!important;position:absolute!important;inset:0!important;border-radius:50%!important;
+ z-index:0!important;pointer-events:none!important;
+ background:linear-gradient(90deg,#b75aff 0%,#8421d2 48.5%,#19d49a 51.5%,#04734e 100%)!important;
+ clip-path:none!important;
+}
+.history-billiard-ball.ball-num-1,.history-billiard-ball.ball-num-3,.history-billiard-ball.ball-num-7,.history-billiard-ball.ball-num-9,
+.mini-recent .history-billiard-ball.ball-num-1,.mini-recent .history-billiard-ball.ball-num-3,.mini-recent .history-billiard-ball.ball-num-7,.mini-recent .history-billiard-ball.ball-num-9{
+ background:radial-gradient(circle at 28% 18%,#eafff5 0%,#7af4c4 12%,#13b77a 38%,#06704c 70%,#023b2a 100%)!important;
+}
+.history-billiard-ball.ball-num-2,.history-billiard-ball.ball-num-4,.history-billiard-ball.ball-num-6,.history-billiard-ball.ball-num-8,
+.mini-recent .history-billiard-ball.ball-num-2,.mini-recent .history-billiard-ball.ball-num-4,.mini-recent .history-billiard-ball.ball-num-6,.mini-recent .history-billiard-ball.ball-num-8{
+ background:radial-gradient(circle at 28% 18%,#fff0f3 0%,#ff8296 12%,#e52b4a 38%,#a20e2b 70%,#530818 100%)!important;
+}
+.history-billiard-ball::after,.mini-recent .history-billiard-ball::after{
+ z-index:2!important;pointer-events:none!important;
+}
+
 </style>
 </head>
 <body>
 
 <div class="auth-screen" id="authScreen">
- <div class="auth-card">
-  <div class="logo" style="margin-bottom:20px">BTR<span style="color:var(--red)"> GAMES</span></div>
-  <h1 class="auth-title" id="authTitle">Welcome back</h1><div class="auth-sub" id="authSub">Log in to continue to Btr Games.</div>
+ <section class="auth-welcome" id="authWelcome" aria-label="BTR Games welcome">
+  <div class="auth-brand-mark" aria-hidden="true"><span class="brand-wing">✈</span><span class="brand-btr">BTR</span><span class="brand-games">GAMES</span></div>
+  <div class="auth-welcome-copy"><div class="auth-eyebrow">WELCOME TO</div><h1>BTR <span>GAMES</span></h1><p>Your next game starts here.</p></div>
+  <div class="auth-welcome-actions">
+   <button class="auth-login-cta" id="authWelcomeLogin" type="button">Login</button>
+   <button class="auth-signup-cta" id="authWelcomeSignup" type="button">Sign Up</button>
+  </div>
+  <div class="auth-welcome-foot">PLAY SMART. ENJOY THE EXPERIENCE.</div>
+ </section>
+ <section class="auth-card" id="authCard" aria-label="Account access">
+  <button class="auth-back" id="authBack" type="button" aria-label="Back to welcome">‹ <span>Back</span></button>
+  <div class="auth-form-heading"><h1 class="auth-title" id="authTitle">Welcome,</h1><div class="auth-sub" id="authSub">Glad to see you!</div></div>
   <form id="authForm">
-   <label class="auth-label" for="authPhone">Phone number</label><input class="auth-input" id="authPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Enter phone number" required maxlength="18">
-   <label class="auth-label" for="authPassword">Password</label><input class="auth-input" id="authPassword" name="password" type="password" autocomplete="current-password" placeholder="At least 8 characters" required minlength="8" maxlength="128">
+   <label class="auth-label" for="authPhone">Phone Number</label><div class="auth-input-wrap"><span class="auth-input-icon" aria-hidden="true">▣</span><input class="auth-input" id="authPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Enter phone number" required maxlength="18"></div>
+   <label class="auth-label" for="authPassword">Password</label><div class="auth-input-wrap"><span class="auth-input-icon" aria-hidden="true">♙</span><input class="auth-input" id="authPassword" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required minlength="8" maxlength="128"><button class="auth-eye" id="authTogglePassword" type="button" aria-label="Show password">◉</button></div>
    <div id="signupFields" class="hidden">
-    <label class="auth-label" for="authConfirmPassword">Confirm password</label><input class="auth-input" id="authConfirmPassword" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Re-enter your password" minlength="8" maxlength="128">
-    <label class="auth-label" for="authUsername">Choose your username</label><input class="auth-input" id="authUsername" name="username" type="text" autocomplete="username" maxlength="18" minlength="3" pattern="[A-Za-z0-9_]{3,18}" placeholder="e.g. user5" />
-    <div class="signup-hint">A username is suggested automatically. You can edit it now or later in Profile.</div>
+    <label class="auth-label" for="authConfirmPassword">Confirm Password</label><div class="auth-input-wrap"><span class="auth-input-icon" aria-hidden="true">♙</span><input class="auth-input" id="authConfirmPassword" name="confirmPassword" type="password" autocomplete="new-password" placeholder="Re-enter password" minlength="8" maxlength="128"><button class="auth-eye" id="authToggleConfirm" type="button" aria-label="Show confirm password">◉</button></div>
+    <label class="auth-label" for="authUsername">Choose Username</label><div class="auth-input-wrap"><span class="auth-input-icon" aria-hidden="true">＠</span><input class="auth-input" id="authUsername" name="username" type="text" autocomplete="username" maxlength="18" minlength="3" pattern="[A-Za-z0-9_]{3,18}" placeholder="Choose a username"></div>
+    <div class="signup-hint">Use 3–18 letters, numbers, or underscores.</div>
    </div>
    <div class="auth-error" id="authError" role="alert"></div>
-   <button class="primary" id="authSubmit" type="submit">Log In</button>
+   <button class="primary auth-submit" id="authSubmit" type="submit">Login</button>
   </form>
-  <button class="auth-switch" id="authSwitch" type="button">New to Btr Games? Create account</button>
-  <div class="lobby-note" style="text-align:center">No OTP required</div>
- </div>
+  <div class="auth-bottom-switch"><span id="authSwitchPrompt">Don't have an account?</span> <button class="auth-switch" id="authSwitch" type="button">Sign Up Now</button></div>
+ </section>
 </div>
 <div class="profile-screen" id="profileScreen" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
  <div class="profile-card">
@@ -699,14 +805,17 @@ function startGameSocket(){
  async function api(url,options={}){const r=await fetch(url,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||'Something went wrong.');return data;}
  function showAuth(){ $('authScreen').classList.remove('hidden'); $('profileScreen').classList.remove('show'); document.body.classList.remove('game-mode'); }
  function showApp(user){currentUser=user;$('authScreen').classList.add('hidden');$('profileUid').textContent=user.uid;$('profilePhone').textContent=user.phone;$('profileUsername').value=user.username;$('lobbyBalance').textContent=Number(user.balance||0).toLocaleString('en-US');$('balance').textContent=Number(user.balance||0).toLocaleString('en-US');if(!socketStarted){socketStarted=true;startGameSocket();}}
- function updateAuthMode(){ $('authTitle').textContent=signupMode?'Create your account':'Welcome back';$('authSub').textContent=signupMode?'Create your Btr Games account with your phone number. No OTP required.':'Log in to continue to Btr Games.';$('authSubmit').textContent=signupMode?'Create Account':'Log In';$('authPassword').autocomplete=signupMode?'new-password':'current-password';$('authPassword').placeholder=signupMode?'Create a strong password':'Enter your password';$('authSwitch').textContent=signupMode?'Already have an account? Log in':'✨ New to Btr Games?  CREATE ACCOUNT';$('authSwitch').style.borderColor=signupMode?'#6b5526':'#ffd36c';$('signupFields').classList.toggle('hidden',!signupMode);$('authConfirmPassword').required=signupMode;$('authUsername').required=signupMode;$('authError').textContent='';$('authPassword').minLength=signupMode?8:1;if(signupMode&&!$('authUsername').value)$('authUsername').value='user5';}
- $('authSwitch').addEventListener('click',()=>{signupMode=!signupMode;updateAuthMode()});
+ function openAuthForm(mode){signupMode=!!mode;$('authWelcome').classList.add('hidden');$('authCard').classList.add('active');updateAuthMode();$('authPhone').focus({preventScroll:true});}
+ function returnAuthWelcome(){$('authCard').classList.remove('active');$('authWelcome').classList.remove('hidden');$('authError').textContent='';}
+ function updateAuthMode(){ $('authTitle').textContent=signupMode?'Create Account':'Welcome,';$('authSub').textContent=signupMode?'to get started now!':'Glad to see you!';$('authSubmit').textContent=signupMode?'Sign Up':'Login';$('authPassword').autocomplete=signupMode?'new-password':'current-password';$('authPassword').placeholder=signupMode?'Create a strong password':'Password';$('authSwitchPrompt').textContent=signupMode?'Already have an account?':"Don't have an account?";$('authSwitch').textContent=signupMode?'Login Now':'Sign Up Now';$('signupFields').classList.toggle('hidden',!signupMode);$('authConfirmPassword').required=signupMode;$('authUsername').required=signupMode;$('authError').textContent='';$('authPassword').minLength=signupMode?8:1;if(signupMode&&!$('authUsername').value)$('authUsername').value='user5';}
+ $('authWelcomeLogin').addEventListener('click',()=>openAuthForm(false));$('authWelcomeSignup').addEventListener('click',()=>openAuthForm(true));$('authBack').addEventListener('click',returnAuthWelcome);$('authSwitch').addEventListener('click',()=>{signupMode=!signupMode;updateAuthMode()});
+ $('authTogglePassword').addEventListener('click',()=>{const i=$('authPassword');i.type=i.type==='password'?'text':'password';$('authTogglePassword').setAttribute('aria-label',i.type==='password'?'Show password':'Hide password')});$('authToggleConfirm').addEventListener('click',()=>{const i=$('authConfirmPassword');i.type=i.type==='password'?'text':'password';$('authToggleConfirm').setAttribute('aria-label',i.type==='password'?'Show confirm password':'Hide confirm password')});
  $('authForm').addEventListener('submit',async e=>{e.preventDefault();$('authSubmit').disabled=true;$('authError').textContent='';try{if(signupMode&&$('authPassword').value!==$('authConfirmPassword').value)throw new Error('Passwords do not match.');const payload={phone:$('authPhone').value,password:$('authPassword').value};if(signupMode)payload.username=$('authUsername').value.trim();const data=await api(signupMode?'/api/auth/signup':'/api/auth/login',{method:'POST',body:JSON.stringify(payload)});showApp(data.user);$('authPassword').value='';$('authConfirmPassword').value='';}catch(err){$('authError').textContent=err.message;}finally{$('authSubmit').disabled=false;}});
  window.openProfile=()=>{if(!currentUser)return; $('profileUid').textContent=currentUser.uid;$('profilePhone').textContent=currentUser.phone;$('profileUsername').value=currentUser.username;$('profileError').textContent='';$('profileScreen').classList.add('show');};
  $('closeProfile').addEventListener('click',()=>$('profileScreen').classList.remove('show'));$('profileScreen').addEventListener('click',e=>{if(e.target===$('profileScreen'))$('profileScreen').classList.remove('show')});
  $('profileForm').addEventListener('submit',async e=>{e.preventDefault();$('profileError').textContent='';try{const data=await api('/api/auth/profile',{method:'PATCH',body:JSON.stringify({username:$('profileUsername').value})});currentUser=data.user;$('profileUsername').value=currentUser.username;$('profileError').style.color='var(--green)';$('profileError').textContent='Username saved.';$('profileError').style.color='';}catch(err){$('profileError').textContent=err.message;}});
  $('logoutButton').addEventListener('click',async()=>{try{await api('/api/auth/logout',{method:'POST',body:'{}'});}catch(_){}if(socketStarted){location.reload();return;}currentUser=null;showAuth();});
- api('/api/auth/me').then(data=>{if(data.user)showApp(data.user);else showAuth();}).catch(()=>showAuth());updateAuthMode();
+ api('/api/auth/me').then(data=>{if(data.user)showApp(data.user);else showAuth();}).catch(()=>showAuth());updateAuthMode();returnAuthWelcome();
 })();
 
 </script>
