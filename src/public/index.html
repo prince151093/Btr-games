@@ -465,38 +465,47 @@ body.mini-mode,body.game-mode,body.mines-mode,body.arcade-mode{
 @media(prefers-reduced-motion:reduce){.return-preview::before{animation:none}.return-pop{animation:none}}
 
 
-/* BTR Aviator refresh: reuse the app's own cinematic menu background and Big/Small gold trim. */
-body{background:linear-gradient(180deg,rgba(3,7,17,.84),rgba(3,7,17,.92)),url("./assets/main-menu-bg.png") center top/cover fixed no-repeat,var(--bg)}
-body.game-mode #gameView{background:transparent}
-body.game-mode .back-row{position:relative;z-index:1}
-body.game-mode #gameView main{background:transparent}
-.aviator-controls-panel{border:1px solid #c89a3c;background:linear-gradient(145deg,rgba(12,17,29,.97),rgba(5,9,18,.97));box-shadow:0 0 0 1px #f5cf6b40 inset,0 12px 32px #0008;border-radius:20px;overflow:hidden}
-.aviator-controls-panel .controls{padding:14px}
-.aviator-controls-topline{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px}
-.aviator-pilot{display:flex;flex-direction:column;gap:2px;min-width:0;line-height:1.15}
-.aviator-pilot-label{font-size:10px;letter-spacing:1.2px;color:#b9a06c;font-weight:850}
-.aviator-pilot strong{font-size:13px;color:#fff;max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.aviator-how-btn{margin-left:auto;flex:0 1 auto;max-width:72%;border:1px solid #e7bd55!important;box-shadow:0 0 0 1px #e7bd5533 inset,0 3px 9px #0005;background:linear-gradient(135deg,#17130a,#080b13)!important;color:#ffe2a0!important;border-radius:10px!important;padding:9px 11px!important;font-size:12px;line-height:1.2;white-space:normal;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
-.aviator-how-btn:active{transform:scale(.97)}
-.aviator-controls-panel .field-label{color:#c4b17f}
-.aviator-controls-panel .bet-input,.aviator-controls-panel .auto-input{background:#080e1b;border:1px solid #b78c37;color:#fff;box-shadow:inset 0 1px 0 #ffffff08}
-.aviator-controls-panel .bet-input:focus,.aviator-controls-panel .auto-input:focus{border-color:#ffdc79;box-shadow:0 0 0 2px #d8a83b25}
-.aviator-controls-panel .small-btn{background:linear-gradient(145deg,#17130b,#080b12);border:1px solid #d8ac4b;color:#ffe5a3;box-shadow:inset 0 0 0 1px #d8ac4b40,0 2px 5px #0007;padding:0 10px;min-width:43px}
-.aviator-controls-panel .primary{background:linear-gradient(135deg,#ffdc79,#d69b24 58%,#9b6815);color:#201605;border:1px solid #ffe7a0;box-shadow:inset 0 1px 0 #fff5c8,0 5px 15px #c58b282b}
-.aviator-controls-panel .primary.cash{background:linear-gradient(135deg,#65f2b5,#16b879);color:#062217;border-color:#8fffd0}
-.aviator-controls-panel .return-preview{border-color:#b88a32;background:linear-gradient(145deg,#111726,#070b14);box-shadow:inset 0 0 0 1px #e4bd5a20}
-.aviator-controls-panel .return-preview-head{color:#c7b27b}
-.aviator-controls-panel .return-number{color:#ffda75}
-.aviator-controls-panel .return-metric{background:#101625;border-color:#493a1d}
-.aviator-controls-panel .return-preview-foot{color:#aeb8c9}
-.aviator-controls-panel .how-panel{border-color:#b88a32;background:#090e19}
-.aviator-history-panel{border-color:#c89a3c;background:linear-gradient(145deg,rgba(12,17,29,.97),rgba(5,9,18,.97));box-shadow:0 0 0 1px #f5cf6b35 inset,0 12px 32px #0007}
-.aviator-history-panel .mini-tab{border:1px solid #9c742c}
-.aviator-history-panel .mini-tab.active{background:linear-gradient(135deg,#ffe6a0,#d7a344);color:#5c3c0a;border-color:#ffe8a5}
-@media(max-width:500px){.aviator-controls-panel .controls{padding:12px}.aviator-controls-topline{gap:7px;margin-bottom:10px}.aviator-how-btn{font-size:11px;padding:8px 9px!important;max-width:73%}.aviator-pilot strong{font-size:12px;max-width:27vw}.aviator-controls-panel .bet-row{gap:6px}.aviator-controls-panel .bet-input{padding:11px 10px}.aviator-controls-panel .small-btn{min-width:0;padding:0 8px;font-size:12px}.aviator-controls-panel .auto-row{margin-top:13px}}
-@media(prefers-reduced-motion:no-preference){.aviator-how-btn{animation:aviatorGoldPulse 3.8s ease-in-out infinite}.aviator-controls-panel .return-number{transition:color .2s ease,text-shadow .2s ease}.aviator-controls-panel .return-number.value-pop{animation:aviatorValuePop .32s ease-out}}
-@keyframes aviatorGoldPulse{0%,100%{box-shadow:0 0 0 1px #e7bd5533 inset,0 3px 9px #0005}50%{box-shadow:0 0 0 1px #ffe5a0a0 inset,0 0 13px #e8b84c24}}
-@keyframes aviatorValuePop{0%{transform:scale(.97);text-shadow:0 0 0 transparent}55%{transform:scale(1.035);text-shadow:0 0 12px #f6ce6577}100%{transform:scale(1);text-shadow:none}}
+
+/* Mines visual repair: use the same cinematic lobby background and gold UI as Big Small. */
+body.mines-mode{
+ background:#05070d url('./assets/main-menu-bg.png') center top/cover fixed no-repeat!important;
+ color:#f5f7fc;
+}
+body.mines-mode::before{
+ content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+ background:linear-gradient(180deg,rgba(3,5,12,.72),rgba(4,7,15,.80) 45%,rgba(3,5,12,.94));
+}
+body.mines-mode #minesView{position:relative;isolation:isolate}
+body.mines-mode .mines-panel{
+ background:linear-gradient(145deg,rgba(7,12,23,.96),rgba(8,11,18,.97))!important;
+ border:1px solid #d6a846!important;border-radius:20px;
+ box-shadow:0 0 0 1px #6d4b1c,0 14px 36px #0009,inset 0 1px 0 #fff3!important;
+}
+body.mines-mode .mines-kicker{color:#f6d57a}
+body.mines-mode .mines-stat{background:linear-gradient(145deg,#171a20,#080b11)!important;border-color:#896629!important;box-shadow:inset 0 1px 0 #fff2,0 3px 9px #0007}
+body.mines-mode .mines-stat small,body.mines-mode .mines-label{color:#d0bd8c}
+body.mines-mode .mines-stat strong{color:#ffdc78;text-shadow:0 0 12px #f4c75a20}
+body.mines-mode .mine-tile{
+ background:linear-gradient(145deg,#202a3a,#0d1420)!important;color:#f6f7fb;
+ border:1px solid #c59b42!important;border-radius:12px;
+ box-shadow:inset 0 1px 0 #fff3,0 0 0 1px #62471d,0 4px 0 #090b10,0 7px 12px #0006!important;
+ transition:transform .16s ease,filter .18s ease,box-shadow .18s ease;
+}
+body.mines-mode .mine-tile:not(:disabled):hover{transform:translateY(-2px);filter:brightness(1.15);box-shadow:inset 0 1px 0 #fff5,0 0 13px #f2c75a24,0 4px 0 #090b10!important}
+body.mines-mode .mine-tile.safe,body.mines-mode .mine-tile.revealed{background:linear-gradient(145deg,#17624d,#0b3028)!important;border-color:#e0bd58!important;color:#b8ffe1}
+body.mines-mode .mine-tile.bomb{background:linear-gradient(145deg,#762b3e,#30101c)!important;border-color:#ff6b80!important;color:#fff}
+body.mines-mode .mines-input,body.mines-mode .mines-select{background:rgba(5,10,20,.94)!important;color:#fff;border:1px solid #b58b39!important;box-shadow:inset 0 1px 3px #0008}
+body.mines-mode .mines-quick button,body.mines-mode .mines-back{background:linear-gradient(145deg,#171a20,#080a0e)!important;color:#f3f5fa;border:1px solid #c79b43!important;box-shadow:inset 0 1px 0 #fff3,0 3px 7px #0007}
+body.mines-mode .mines-quick button.active{background:linear-gradient(145deg,#4a391b,#21190c)!important;color:#ffe18b;border-color:#ffe18b!important}
+body.mines-mode .mines-primary{background:linear-gradient(115deg,#ffe28a,#e7ad32 55%,#c88818)!important;color:#241806;border:1px solid #fff0a1!important;box-shadow:inset 0 1px 0 #fff9,0 4px 12px #0008,0 0 0 1px #77531b!important}
+body.mines-mode .mines-primary.cashout{background:linear-gradient(115deg,#ffe28a,#e7ad32 55%,#c88818)!important;color:#241806}
+body.mines-mode .mines-message{color:#f2d78c}
+body.mines-mode .mines-fair-note{color:#aab7cb}
+body.mines-mode .mines-history-row{border-bottom-color:#d0a84c30}
+body.mines-mode .mines-history-row strong{color:#ffdc78}
+@keyframes minesTileReveal{0%{transform:scale(.86);filter:brightness(1.5)}70%{transform:scale(1.04)}100%{transform:scale(1);filter:brightness(1)}}
+body.mines-mode .mine-tile.safe,body.mines-mode .mine-tile.bomb{animation:minesTileReveal .24s ease-out both}
+@media(prefers-reduced-motion:reduce){body.mines-mode .mine-tile{transition:none}body.mines-mode .mine-tile.safe,body.mines-mode .mine-tile.bomb{animation:none}}
 
 </style>
 </head>
@@ -598,13 +607,10 @@ body.game-mode #gameView main{background:transparent}
  <div class="flare" id="flare"></div>
  <div class="flight-footer"><span id="roundText">Round waiting to start</span><span id="timerText">Place your bet</span></div>
 </section>
-<section class="panel aviator-controls-panel">
+<section class="panel">
  <div class="controls">
-  <div class="aviator-controls-topline">
-   <div class="aviator-pilot"><span class="aviator-pilot-label">PILOT</span><strong id="pilotName">Connecting…</strong><span id="balance" hidden>0</span></div>
-   <button type="button" class="quick-bet aviator-how-btn" id="aviatorHowBtn">How to Play / खेलने का तरीका</button>
-  </div>
-  <div id="aviatorHowPanel" class="how-panel" hidden></div>
+  <button type="button" class="quick-bet" id="aviatorHowBtn">How to Play / खेलने का तरीका</button><div id="aviatorHowPanel" class="how-panel" hidden></div>
+  <div class="balance-line"><span id="balance" hidden>0</span><div class="muted" style="font-size:12px;text-align:right;margin-left:auto">PILOT<br><strong id="pilotName" style="color:#fff">Connecting…</strong></div></div>
   <label class="field-label" for="betAmount">BET AMOUNT (COINS)</label>
   <div class="bet-row"><input id="betAmount" class="bet-input" type="number" min="1" max="1000" step="1" value="100"><button class="small-btn" data-amount="10">10</button><button class="small-btn" data-amount="20">20</button><button class="small-btn" data-amount="50">50</button><button class="small-btn" data-amount="100">100</button></div>
   <div class="auto-row"><label class="field-label" for="autoCashout">AUTO CASH-OUT MULTIPLIER (×)</label><input id="autoCashout" class="auto-input" type="number" min="1.01" max="100" step="0.01" inputmode="decimal" placeholder="Enter multiplier, e.g. 1.50"><div class="auto-help">Leave blank to cash out manually. Auto cash-out triggers at your target before the crash.</div></div>
@@ -857,6 +863,8 @@ function startGameSocket(){
 // Mines controller: the server owns mine placement, settlement and coin balance.
 (()=>{
  const $=id=>document.getElementById(id);let game=null,history=[];
+ // This controller runs in its own closure; do not depend on the Aviator closure's helper.
+ function setAnimatedValue(el,value){if(!el)return;const next=String(value);if(el.textContent===next)return;el.textContent=next;el.classList.remove('return-pop');void el.offsetWidth;el.classList.add('return-pop');}
  async function api(url,options={}){const r=await fetch(url,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Mines request failed.');return d;}
  const money=n=>Math.max(0,Math.floor(Number(n)||0)).toLocaleString('en-US');
  function balance(n){if(!Number.isFinite(Number(n)))return;$('minesBalance').textContent=money(n);if($('lobbyBalance'))$('lobbyBalance').textContent=money(n);if($('balance'))$('balance').textContent=money(n);}
