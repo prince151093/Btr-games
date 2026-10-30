@@ -286,7 +286,7 @@ app.post('/api/wallet/deposits',authRequired,async(req,res)=>{
 app.get('/api/wallet/deposits',authRequired,async(req,res)=>{const {data,error}=await supabase.from('crashzone_wallet_deposits').select('id,amount,payment_name,status,admin_note,created_at,reviewed_at').eq('user_id',req.account.id).order('created_at',{ascending:false}).limit(200);if(error)return res.status(503).json({error:'Deposit history unavailable. Apply wallet-schema.sql.'});res.json({deposits:data||[]});});
 app.post('/api/wallet/withdrawals',authRequired,async(req,res)=>{
   const amount=Number(req.body?.amount),upiId=String(req.body?.upiId||'').trim().slice(0,120);
-  if(!Number.isSafeInteger(amount)||amount<300||amount>10000000)return res.status(400).json({error:'Minimum withdrawal is 300 coins.'});
+  if(!Number.isSafeInteger(amount)||amount<300||amount>10000000)return res.status(400).json({error:'Minimum withdrawal is 300 cash.'});
   if(!/^[A-Za-z0-9._-]{2,100}@[A-Za-z0-9.-]{2,60}$/.test(upiId))return res.status(400).json({error:'Enter a valid UPI ID.'});
   const user=database.users.find(u=>u.id===req.account.id); if(!user||user.balance<amount)return res.status(400).json({error:'Insufficient coin balance.'});
   // Reserve coins while pending; a rejected request returns them.
@@ -519,9 +519,9 @@ app.post('/api/mines/start', authRequired, async (req, res) => {
   const existing = minesGames.get(req.account.id);
   if (existing && (existing.status === 'active' || existing.status === 'starting')) return res.status(409).json({ error: 'Finish your current Mines round first.' });
   const stake = Number(req.body?.amount), mineCount = Number(req.body?.mines);
-  if (!Number.isSafeInteger(stake) || stake < 1 || stake > 1000) return res.status(400).json({ error: 'Bet amount must be 1–1,000 coins.' });
+  if (!Number.isSafeInteger(stake) || stake < 1 || stake > 1000) return res.status(400).json({ error: 'Bet amount must be 1–1,000 cash.' });
   if (!Number.isInteger(mineCount) || mineCount < 1 || mineCount > 24) return res.status(400).json({ error: 'Choose 1–24 mines.' });
-  if (stake > req.account.balance) return res.status(400).json({ error: 'Not enough coins.' });
+  if (stake > req.account.balance) return res.status(400).json({ error: 'Not enough cash.' });
   const mineSet = new Set();
   while (mineSet.size < mineCount) mineSet.add(crypto.randomInt(0, 25));
   minesGames.set(req.account.id, { status: 'starting' });
@@ -567,8 +567,8 @@ app.post('/api/arcade/play', authRequired, async (req, res) => {
   if (arcadeBusy.has(user.id)) return res.status(409).json({ error: 'A game is already being settled. Try again shortly.' });
   const game = String(req.body?.game || ''), stake = Number(req.body?.amount);
   if (!['tower','plinko'].includes(game)) return res.status(400).json({ error: 'Unknown game.' });
-  if (!Number.isSafeInteger(stake) || stake < 1 || stake > 1000) return res.status(400).json({ error: 'Bet amount must be 1–1,000 coins.' });
-  if (stake > user.balance) return res.status(400).json({ error: 'Not enough coins.' });
+  if (!Number.isSafeInteger(stake) || stake < 1 || stake > 1000) return res.status(400).json({ error: 'Bet amount must be 1–1,000 cash.' });
+  if (stake > user.balance) return res.status(400).json({ error: 'Not enough cash.' });
   let multiplier, won, detail;
   if (game === 'tower') {
     const floors = Number(req.body?.floors);
