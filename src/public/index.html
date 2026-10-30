@@ -606,6 +606,26 @@ body.mines-mode .mines-history-row{border-bottom-color:#b58b3a35!important}
 body.mines-mode .mines-history-row strong{color:#f5d176!important}
 @media(max-width:500px){body.mines-mode{background-position:center top;background-size:auto 100vh;background-attachment:scroll}}
 
+
+/* Final mobile corrections: shorten yellow round header and center number badges */
+#miniView .wingo-topbar{min-height:0!important;height:auto!important;padding:7px 10px!important;gap:6px!important;align-items:center!important;grid-template-columns:minmax(0,1fr) minmax(0,.9fr)!important}
+#miniView .wingo-top-left{gap:4px!important;justify-content:center!important}
+#miniView .wingo-how{padding:4px 8px!important;font-size:11px!important;line-height:1.1!important}
+#miniView .wingo-game-name{font-size:15px!important;line-height:1.05!important;margin:0!important}
+#miniView .wingo-time{padding:0 0 0 7px!important;justify-content:center!important}
+#miniView .wingo-time-label{font-size:13px!important;line-height:1.1!important}
+#miniView .mini-clock{font-size:clamp(26px,7vw,34px)!important;line-height:1!important;padding:3px 7px!important;margin:3px 0!important;letter-spacing:3px!important}
+#miniView .mini-round{font-size:9px!important;line-height:1.1!important;margin:0!important}
+#miniView .mini-recent{min-height:22px!important;height:22px!important;margin:1px 0 0!important;gap:4px!important;align-items:center!important;overflow:hidden!important}
+#miniView .mini-recent .history-billiard-ball{width:22px!important;height:22px!important;flex:0 0 22px!important}
+#miniView #miniOptions{padding:8px 10px!important}
+#miniView .wingo-color-row{padding:7px 9px!important}
+#miniView .wingo-color-buttons{gap:6px!important}
+#miniView .wingo-color-pick{min-height:39px!important;font-size:14px!important}
+#miniView .wingo-numbers{margin-top:7px!important;padding:7px!important;gap:6px!important}
+#miniView #miniOptions .wingo-numbers .wingo-ball{display:block!important;position:relative!important;overflow:visible!important}
+#miniView #miniOptions .wingo-numbers .wingo-ball .ball-number-label{position:absolute!important;left:50%!important;top:50%!important;right:auto!important;bottom:auto!important;inset:auto!important;transform:translate(-50%,-50%)!important;width:48%!important;height:48%!important;min-width:0!important;min-height:0!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;border-radius:50%!important;line-height:1!important;z-index:30!important;font-size:clamp(17px,4vw,26px)!important}
+@media(max-width:480px){#miniView .wingo-topbar{padding:6px 9px!important;min-height:0!important}#miniView .wingo-time-label{font-size:12px!important}#miniView .mini-clock{font-size:clamp(25px,7vw,32px)!important}#miniView .mini-recent .history-billiard-ball{width:21px!important;height:21px!important;flex-basis:21px!important}#miniView .wingo-color-pick{min-height:36px!important}#miniView .wingo-numbers{padding:6px!important;gap:5px!important}}
 </style>
 </head>
 <body>
