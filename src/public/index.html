@@ -357,6 +357,45 @@ header{background:#050711d9!important;border-bottom:1px solid #f7b83d55!importan
 #miniView .history-billiard-ball.ball-num-5,#miniView .mini-recent .history-billiard-ball.ball-num-5{--ball-hi:#b8ffd9;--ball-mid:#16a968;--ball-low:#075333;background:radial-gradient(circle at 30% 22%,#fff 0,#ffffff80 4%,transparent 19%),radial-gradient(circle at 35% 25%,#b8ffd9 0,#16a968 42%,#075333 100%)!important}
 #miniView .history-billiard-ball.ball-num-0::before,#miniView .history-billiard-ball.ball-num-5::before,#miniView .mini-recent .history-billiard-ball.ball-num-0::before,#miniView .mini-recent .history-billiard-ball.ball-num-5::before{background:radial-gradient(circle at 32% 22%,#df8cff 0%,#9636d0 48%,#511080 100%)!important;clip-path:inset(0 50% 0 0)!important}
 
+\n/* Compact mobile WinGo layout: centered number badges and five visible recent balls */
+#miniView .wingo-topbar{min-height:0!important;padding:10px 12px!important;gap:8px!important}
+#miniView .wingo-top-left{gap:6px!important}
+#miniView .wingo-how{padding:5px 10px!important;font-size:12px!important}
+#miniView .wingo-game-name{font-size:15px!important;line-height:1.1!important}
+#miniView .mini-recent{display:flex!important;flex-wrap:nowrap!important;gap:4px!important;align-items:center!important;min-height:26px!important;width:100%!important;overflow:hidden!important}
+#miniView .mini-recent .history-billiard-ball{width:25px!important;height:25px!important;flex:0 0 25px!important;margin:0!important}
+#miniView .mini-recent .history-billiard-ball .ball-number-label{position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:52%!important;height:52%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;line-height:1!important;font-size:10px!important}
+#miniView .wingo-time-label{font-size:14px!important}
+#miniView .mini-clock{font-size:clamp(28px,6vw,40px)!important;padding:2px 7px!important;margin:4px 0!important;letter-spacing:3px!important}
+#miniView .mini-round{font-size:10px!important}
+#miniView .wingo-color-row{padding:7px 9px!important}
+#miniView .wingo-color-buttons{gap:7px!important}
+#miniView .wingo-color-pick{min-height:42px!important;border-radius:10px 10px 3px 10px!important;font-size:16px!important}
+#miniView #miniOptions{padding:7px 9px!important}
+#miniView .wingo-numbers{gap:6px!important;margin:5px 0 0!important;padding:7px!important;border-radius:14px!important}
+#miniView .wingo-ball{max-width:clamp(48px,15vw,76px)!important;justify-self:center!important}
+#miniView .wingo-ball .ball-number-label{position:absolute!important;left:50%!important;top:50%!important;inset:auto!important;transform:translate(-50%,-50%)!important;width:48%!important;height:48%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;line-height:1!important;font-size:clamp(17px,4vw,27px)!important}
+#miniView .wingo-bet-quick{padding:6px 10px 0!important;gap:5px!important}
+#miniView .wingo-bet-quick .quick-bet{min-height:38px!important;padding:5px 4px!important;font-size:13px!important;border-radius:10px!important}
+#miniView .wingo-bet-quick .random-pick{flex:1.25!important}
+#miniView .field-label[for=miniAmount]{padding:6px 12px 3px!important;font-size:11px!important}
+#miniView #miniAmount{height:39px!important;margin:0 10px!important;width:calc(100% - 20px)!important;padding:7px 11px!important;font-size:16px!important}
+#miniView .wingo-size-row{margin:9px 12px 10px!important}
+#miniView .wingo-size{min-height:48px!important;font-size:22px!important}
+#miniView .return-preview{margin:0 10px 8px!important;padding:9px!important}
+#miniView .return-preview *{line-height:1.2}
+#miniView .mini-action{min-height:42px!important;padding:9px!important;margin:0 10px 5px!important;width:calc(100% - 20px)!important;font-size:14px!important}
+#miniView .mini-message{padding:0 10px 7px!important;margin-top:4px!important;min-height:13px!important;font-size:10px!important}
+#miniView .wingo-panel{border-radius:16px!important}
+@media(max-width:480px){
+ #miniView{padding:0 7px!important;margin:0 auto 45px!important}
+ #miniView .wingo-topbar{padding:8px 9px!important;grid-template-columns:1.1fr .9fr!important}
+ #miniView .mini-recent .history-billiard-ball{width:23px!important;height:23px!important;flex-basis:23px!important}
+ #miniView .wingo-color-pick{min-height:38px!important;font-size:14px!important}
+ #miniView .wingo-numbers{gap:5px!important;padding:6px!important}
+ #miniView .wingo-bet-quick .quick-bet{min-height:35px!important;font-size:12px!important}
+ #miniView .wingo-size{min-height:44px!important;font-size:20px!important}
+}
 </style>
 <style>
 .wallet-modal{position:fixed;inset:0;z-index:1000;background:#030711d9;display:grid;place-items:center;padding:14px}.wallet-modal[hidden]{display:none}.wallet-modal-card{width:min(620px,100%);max-height:90dvh;overflow:auto;background:linear-gradient(145deg,#172237,#0b1220);border:1px solid #35445d;border-radius:20px;padding:18px;color:#f5f7fb;box-shadow:0 24px 80px #0009}.wallet-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.wallet-modal-head h2{margin:0;font-size:22px}.wallet-close{background:#26344b;color:white;border:1px solid #41516b;border-radius:10px;padding:8px 12px}.wallet-form-label{display:block;color:#a9bad2;font-size:13px;margin:12px 0 6px}.wallet-form-input{width:100%;padding:12px;border:1px solid #354966;border-radius:11px;background:#070e1a;color:white;font:inherit}.wallet-primary{width:100%;border:0;border-radius:12px;background:linear-gradient(135deg,#ffe29a,#d9a84b);color:#2a1b04;font-weight:900;padding:13px;margin-top:14px}.wallet-quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0}.wallet-quick{background:#17253b;border:1px solid #344a69;border-radius:10px;padding:10px 3px;color:#f4f7ff;font-weight:800}.wallet-quick.active{border-color:#ffd36c;background:#3c3421;color:#ffe09a}.wallet-qr{display:block;width:min(260px,100%);margin:12px auto;background:white;border-radius:12px;padding:8px}.wallet-note{font-size:12px;line-height:1.5;color:#a9bad2}.wallet-list{display:grid;gap:8px}.wallet-list-item{border:1px solid #2b3b55;background:#0c1525;border-radius:12px;padding:12px;overflow-wrap:anywhere}.wallet-list-item strong{color:#ffe09a}.wallet-status{display:inline-block;border-radius:99px;padding:4px 8px;background:#293951;font-size:11px;text-transform:uppercase}.wallet-status.approved{background:#123d31;color:#80f1c0}.wallet-status.rejected{background:#4a202b;color:#ffb0bd}@media(max-width:420px){.wallet-modal-card{padding:13px}.wallet-quick-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
